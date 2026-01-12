@@ -1,0 +1,628 @@
+sensor:
+  - platform: dht
+    pin: 
+      number: ${pin_dht22}
+      mode:
+        input: true
+        pullup: false
+    temperature:
+      name: "Local Temperature"
+      id: local_temperature
+      accuracy_decimals: 1
+      web_server:
+        sorting_group_id: group_temp_sensors
+      filters:
+        - sliding_window_moving_average:
+            window_size: 3
+            send_every: 1
+        - heartbeat: 10s
+      on_value:
+        then:
+          - component.update: effective_temperature
+    humidity:
+      name: "Local Humidity"
+      id: local_humidity
+      accuracy_decimals: 0
+      web_server:
+        sorting_group_id: group_humidifier
+      filters:
+        - sliding_window_moving_average:
+            window_size: 3
+            send_every: 1
+        - heartbeat: 10s
+      on_value:
+        then:
+          - component.update: effective_humidity
+    update_interval: 30s
+
+# Minimum runtime dashboard sensor and actions
+  - platform: template
+    name: "Min Runtime Remaining"
+    id: runtime_remaining
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
+    icon: "mdi:timer-play-outline"
+    web_server:
+      sorting_group_id: group_climate
+    update_interval: 1s
+    lambda: |-
+      unsigned long now = millis();
+      
+      // Check Cooling Runtime Countdown
+      if (id(cool_relay).state && id(cool_start_time) > 0) {
+        unsigned long min_cool_ms = id(min_cool_run_minutes).state * 60 * 1000;
+        long remaining = (long)min_cool_ms - (now - id(cool_start_time));
+        return (remaining > 0) ? (float)remaining / 1000.0 : 0.0;
+      }
+      // Check Heating Runtime Countdown
+      if (id(heat_stage1_relay).state && id(heat_stage1_start_time) > 0) {
+        unsigned long min_heat_ms = id(min_heat_run_minutes).state * 60 * 1000;
+        long remaining = (long)min_heat_ms - (now - id(heat_stage1_start_time));
+        return (remaining > 0) ? (float)remaining / 1000.0 : 0.0;
+      }
+      return 0.0;
+
+# Compressor lockout (minimum cool off time)
+  - platform: template
+    name: "Compressor Lockout Remaining"
+    id: lockout_remaining
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
+    icon: "mdi:lock-clock"
+    web_server:
+      sorting_group_id: group_runtimes
+    update_interval: 1s
+    lambda: |-
+      unsigned long now = millis();
+      unsigned long lockout_ms = id(min_compressor_off_minutes).state * 60 * 1000;
+      if (id(last_compressor_stop_time) == 0) return 0.0;
+
+      long remaining = (long)lockout_ms - (now - id(last_compressor_stop_time));
+      return (remaining > 0) ? (float)remaining / 1000.0 : 0.0;
+
+# Stage 2 heating delay
+  - platform: template
+    name: "Stage 2 Delay Remaining"
+    id: stage2_remaining
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
+    icon: "mdi:clock-fast"
+    web_server:
+      sorting_group_id: group_runtimes
+    update_interval: 1s
+    lambda: |-
+      // Only calculate if Stage 1 is on but Stage 2 is still off
+      if (id(heat_stage1_relay).state && !id(heat_stage2_relay).state && id(heat_stage1_start_time) > 0) {
+        unsigned long now = millis();
+        unsigned long delay_ms = id(stage2_delay_minutes).state * 60 * 1000;
+        long remaining = (long)delay_ms - (now - id(heat_stage1_start_time));
+        return (remaining > 0) ? (float)remaining / 1000.0 : 0.0;
+      }
+      return 0.0;
+
+
+  # Remote Temperature Override (from Home Assistant)
+  - platform: template
+    name: "Remote Temperature"
+    id: remote_temperature_override
+    accuracy_decimals: 1
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    web_server:
+      sorting_group_id: group_temp_sensors
+    internal: false
+
+  # Remote Humidity Override (from Home Assistant)
+  - platform: template
+    name: "Remote Humidity"
+    id: remote_humidity_override
+    accuracy_decimals: 0
+    unit_of_measurement: "%"
+    device_class: humidity
+    state_class: measurement
+    web_server:
+      sorting_group_id: group_humidifier
+    internal: false
+
+  # Humidifier Setpoint Override (from Home Assistant)
+  - platform: template
+    name: "Humidifier Setpoint"
+    id: humidifier_setpoint_override
+    accuracy_decimals: 0
+    unit_of_measurement: "%"
+    icon: "mdi:water-percent"
+    web_server:
+      sorting_group_id: group_humidifier
+    internal: false
+
+  # Ecobee Temperature Sensor (Backup option)
+  - platform: template
+    name: "Ecobee Temperature"
+    id: ecobee_temperature_sensor
+    accuracy_decimals: 1
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    web_server:
+      sorting_group_id: group_temp_sensors
+    internal: false
+
+  # Effective Temperature (Smart selector: ecobee (if toggle) → remote → local)
+  - platform: template
+    name: "Effective Temperature"
+    id: effective_temperature
+    accuracy_decimals: 1
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    web_server:
+      sorting_group_id: group_temp_sensors
+    lambda: |-
+      float local_temp = id(local_temperature).state;
+      bool local_is_valid = !isnan(local_temp);
+
+      // 1. Priority: Ecobee (if toggle enabled)
+      if (id(use_ecobee_temp).state) {
+        float ecobee_temp = id(ecobee_temperature_sensor).state;
+        bool ecobee_is_valid = !isnan(ecobee_temp) && ecobee_temp > 5.0 && ecobee_temp < 35.0;
+        if (ecobee_is_valid) {
+          return ecobee_temp;
+        }
+      }
+
+      // 2. Process Remote (HA Averaged)
+      unsigned long time_since_update = millis() - id(last_remote_temp_update);
+      bool remote_is_fresh = time_since_update < (${remote_temp_timeout} * 1000);
+      float remote_temp = id(remote_temperature_override).state;
+      bool remote_is_valid = !isnan(remote_temp) && remote_temp > 5.0 && remote_temp < 35.0;
+      
+      // SANITY CHECK: Compare remote to local
+      // If the difference is > 10°C, we assume the HA average is "insane" (e.g. a sensor in a sunlit room)
+      bool remote_is_sane = true;
+      if (remote_is_valid && local_is_valid) {
+        if (abs(remote_temp - local_temp) > 10.0) {
+          remote_is_sane = false;
+          ESP_LOGW("effective_temp", "Remote (%.1f) deviates too far from Local (%.1f). Flagging insane.", remote_temp, local_temp);
+        }
+      }
+
+      // Use remote if fresh, valid, and sane
+      if (remote_is_fresh && remote_is_valid && remote_is_sane) {
+        return remote_temp;
+      }
+
+      // 3. Fallback to local DHT22
+      if (local_is_valid) {
+        if (!remote_is_sane) {
+          ESP_LOGW("effective_temp", "Using local: Remote reading was WILDLY different.");
+        } else if (!remote_is_fresh) {
+          ESP_LOGW("effective_temp", "Using local: Remote temperature stale.");
+        }
+        return local_temp;
+      } else {
+        ESP_LOGE("effective_temp", "All temperatures invalid! Safety fallback to 5.0C (41F) to prevent freezing");
+        return 21.0;
+      }
+    on_value:
+      then:
+        - script.execute: update_status_led
+    update_interval: 10s
+
+  # "Feels Like" Inside temperature (Apparent Temperature with humidity compensation)
+  - platform: template
+    name: "Feels Like Temperature"
+    id: feels_like_temperature
+    accuracy_decimals: 1
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    web_server:
+      sorting_group_id: group_temp_sensors
+    lambda: |-
+      float temp = id(effective_temperature).state;
+      float humidity = id(effective_humidity).state;
+
+      // Validate inputs
+      if (isnan(temp) || isnan(humidity)) {
+        return temp;  // Return raw temp if humidity unavailable
+      }
+
+      // For cooling (warm temps): Calculate heat index when temp >= 27°C
+      if (temp >= 27.0) {
+        // Simplified heat index formula (Steadman's formula)
+        float hi = -8.78469475556 +
+                   1.61139411 * temp +
+                   2.33854883889 * humidity +
+                   -0.14611605 * temp * humidity +
+                   -0.012308094 * temp * temp +
+                   -0.0164248277778 * humidity * humidity +
+                   0.002211732 * temp * temp * humidity +
+                   0.00072546 * temp * humidity * humidity +
+                   -0.000003582 * temp * temp * humidity * humidity;
+
+        // Heat index only applies when it's warmer than actual temp
+        if (hi > temp) {
+          ESP_LOGD("feels_like", "Heat index: %.1f°C (actual: %.1f°C, humidity: %.0f%%)", hi, temp, humidity);
+          return hi;
+        }
+      }
+
+      // For heating (cool temps): Adjust for low humidity making it feel cooler
+      // Every 10% below 40% humidity makes it feel ~0.3°C cooler
+      if (temp < 22.0 && humidity < 40.0) {
+        float humidity_penalty = (40.0 - humidity) / 10.0 * 0.3;
+        float adjusted = temp - humidity_penalty;
+        ESP_LOGD("feels_like", "Low humidity adjustment: %.1f°C (actual: %.1f°C, humidity: %.0f%%)", adjusted, temp, humidity);
+        return adjusted;
+      }
+
+      // No significant apparent temperature effect in comfortable range
+      return temp;
+    update_interval: 30s
+
+  # Final Compensated Temperature (uses feels like if enabled, otherwise effective)
+  # TODO: rename this to make it easier to use, be sure to update everywhere its used in HA and ESPhome
+  - platform: template
+    name: "Compensated Temperature"
+    id: compensated_temperature
+    accuracy_decimals: 1
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    web_server:
+      sorting_group_id: group_temp_sensors
+    lambda: |-
+      if (id(use_feels_like_temp).state) {
+        return id(feels_like_temperature).state;
+      } else {
+        return id(effective_temperature).state;
+      }
+    update_interval: 10s
+
+  # Effective Humidity (Smart selector between remote and local)
+  - platform: template
+    name: "Effective Humidity"
+    id: effective_humidity
+    accuracy_decimals: 0
+    unit_of_measurement: "%"
+    device_class: humidity
+    state_class: measurement
+    web_server:
+      sorting_group_id: group_humidifier
+    lambda: |-
+      unsigned long time_since_update = millis() - id(last_remote_humidity_update);
+      bool remote_is_fresh = time_since_update < (${remote_humidity_timeout} * 1000);
+      float remote_hum = id(remote_humidity_override).state;
+      bool remote_is_valid = !isnan(remote_hum) && remote_hum > 0.0 && remote_hum < 100.0;
+
+      if (remote_is_fresh && remote_is_valid) {
+        return remote_hum;
+      } else {
+        if (!remote_is_fresh && remote_is_valid) {
+          ESP_LOGW("effective_humidity", "Remote humidity stale (%.0f sec old), using local", time_since_update / 1000.0);
+        }
+        float local_hum = id(local_humidity).state;
+        if (!isnan(local_hum)) {
+          return local_hum;
+        } else {
+          ESP_LOGE("effective_humidity", "Both remote and local humidity invalid!");
+          return 40.0;
+        }
+      }
+    update_interval: 10s
+    on_value:
+      then:
+        - script.execute: update_humidifier_state
+
+  # WiFi Signal Strength
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    web_server:
+      sorting_group_id: group_runtimes
+    update_interval: 60s
+
+  # Uptime Sensor
+  - platform: uptime
+    name: "Uptime"
+    id: uptime_sensor
+    web_server:
+      sorting_group_id: group_runtimes
+    update_interval: 60s
+
+  # Runtime tracking sensors
+  - platform: template
+    name: "Heat Stage 1 Runtime Today"
+    id: heat_stage1_runtime_sensor
+    unit_of_measurement: "min"
+    accuracy_decimals: 0
+    state_class: total_increasing
+    device_class: duration
+    web_server:
+      sorting_group_id: group_runtimes
+    lambda: 'return id(heat_stage1_runtime_today);'
+    update_interval: 60s
+
+  - platform: template
+    name: "Heat Stage 2 Runtime Today"
+    id: heat_stage2_runtime_sensor
+    unit_of_measurement: "min"
+    accuracy_decimals: 0
+    state_class: total_increasing
+    device_class: duration
+    web_server:
+      sorting_group_id: group_runtimes
+    lambda: 'return id(heat_stage2_runtime_today);'
+    update_interval: 60s
+
+  - platform: template
+    name: "Cooling Runtime Today"
+    id: cooling_runtime_sensor
+    unit_of_measurement: "min"
+    accuracy_decimals: 0
+    state_class: total_increasing
+    device_class: duration
+    web_server:
+      sorting_group_id: group_runtimes
+    lambda: 'return id(cooling_runtime_today);'
+    update_interval: 60s
+
+  - platform: template
+    name: "Filter Runtime"
+    id: filter_runtime_sensor
+    unit_of_measurement: "min"
+    accuracy_decimals: 0
+    web_server:
+      sorting_group_id: group_runtimes
+    lambda: 'return id(filter_runtime_minutes);'
+    update_interval: 60s
+
+  # Outdoor temperature (from Home Assistant weather integration)
+  - platform: homeassistant
+    name: "Outdoor Temperature"
+    id: outdoor_temperature
+    entity_id: ${outdoor_temp_entity}
+    web_server:
+      sorting_group_id: group_temp_sensors
+    internal: false
+
+  # Outdoor humidity (from Home Assistant weather integration)
+  - platform: homeassistant
+    name: "Outdoor Humidity"
+    id: outdoor_humidity
+    entity_id: ${outdoor_humidity_entity}
+    web_server:
+      sorting_group_id: group_humidifier
+    internal: false
+
+# Text sensors for status
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+    ssid:
+      name: "SSID"
+
+# Dispaly ESPHome version in the dashboard
+  - platform: version
+    name: "ESPHome Version"
+
+# Display our build/config version
+  - platform: template
+    name: "Configuration Version"
+    id: config_version_sensor
+    icon: "mdi:git"
+    lambda: |-
+      return std::string("${config_version}");
+
+  # Temperature source indicator
+  - platform: template
+    name: "Temperature Source"
+    id: temperature_source
+    lambda: |-
+      // Check which temperature source is being used
+      // Priority: Ecobee (if toggle) → Remote → Local
+      std::string base_source;
+
+      // First check if ecobee toggle is enabled
+      if (id(use_ecobee_temp).state) {
+        float ecobee_temp = id(ecobee_temperature_sensor).state;
+        bool ecobee_is_valid = !isnan(ecobee_temp) && ecobee_temp > 5.0 && ecobee_temp < 35.0;
+        if (ecobee_is_valid) {
+          base_source = "Ecobee (Override)";
+        } else {
+          base_source = "Ecobee Invalid - Fallback";
+        }
+      }
+
+      // If not using ecobee, check remote
+      if (base_source.empty() || base_source.find("Fallback") != std::string::npos) {
+        unsigned long time_since_update = millis() - id(last_remote_temp_update);
+        bool remote_is_fresh = time_since_update < (${remote_temp_timeout} * 1000);
+        float remote_temp = id(remote_temperature_override).state;
+        bool remote_is_valid = !isnan(remote_temp) && remote_temp > 5.0 && remote_temp < 35.0;
+
+        if (remote_is_fresh && remote_is_valid) {
+          base_source = "Remote (HA Averaged)";
+        } else if (!remote_is_fresh && remote_is_valid) {
+          base_source = "Local (HA Offline)";
+        } else {
+          base_source = "Local (DHT22)";
+        }
+      }
+
+      // Add feels like indicator if enabled
+      if (id(use_feels_like_temp).state) {
+        base_source += " + Feels Like";
+      }
+
+      return base_source;
+    update_interval: 10s
+
+  # Humidity source indicator
+  - platform: template
+    name: "Humidity Source"
+    id: humidity_source
+    lambda: |-
+      unsigned long time_since_update = millis() - id(last_remote_humidity_update);
+      bool remote_is_fresh = time_since_update < (${remote_humidity_timeout} * 1000);
+      float remote_hum = id(remote_humidity_override).state;
+      bool remote_is_valid = !isnan(remote_hum) && remote_hum > 0.0 && remote_hum < 100.0;
+
+      if (remote_is_fresh && remote_is_valid) {
+        return {"Remote (HA)"};
+      } else if (!remote_is_fresh) {
+        return {"Local (HA Offline)"};
+      } else {
+        return {"Local (Invalid Remote)"};
+      }
+    update_interval: 10s
+
+# Binary sensors for system state
+binary_sensor:
+
+  - platform: status
+    id: api_connected_sensor
+    on_press:
+      then:
+        - lambda: |-
+            id(boot_lockout) = false;
+            ESP_LOGI("api", "Boot lockout released - Home Assistant connected");
+            id(api_disconnect_time) = 0;
+            id(alarm_acknowledged) = false;
+        - delay: 2s
+        - rtttl.play: "api:d=24,o=5,b=120:c,c,c,g6" # Bright, 4-note chime
+        - lambda: |-
+            ESP_LOGI("api", "API link active");
+    on_release:
+      then:
+        - lambda: |-
+            ESP_LOGW("api", "API connection lost");
+        - script.execute: update_status_led
+  - platform: status
+    name: "Status"
+
+  # Ecobee Input Sensors (reading ecobee's relay outputs)
+  - platform: gpio
+    pin:
+      number: GPIO4
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Ecobee Heat Stage 1 Input"
+    id: ecobee_w1_input
+    device_class: heat
+    on_press:
+      - script.execute: update_passthrough_relays
+    on_release:
+      - script.execute: update_passthrough_relays
+
+  - platform: gpio
+    pin:
+      number: GPIO5
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Ecobee Heat Stage 2 Input"
+    id: ecobee_w2_input
+    device_class: heat
+    on_press:
+      - script.execute: update_passthrough_relays
+    on_release:
+      - script.execute: update_passthrough_relays
+
+  - platform: gpio
+    pin:
+      number: GPIO6
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Ecobee Cooling Input"
+    id: ecobee_y1_input
+    device_class: cold
+    on_press:
+      - script.execute: update_passthrough_relays
+    on_release:
+      - script.execute: update_passthrough_relays
+
+  - platform: gpio
+    pin:
+      number: GPIO7
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Ecobee Fan Input"
+    id: ecobee_g_input
+    device_class: running
+    on_press:
+      - script.execute: update_passthrough_relays
+    on_release:
+      - script.execute: update_passthrough_relays
+
+  # Remote temperature staleness indicator
+  - platform: template
+    name: "Remote Temperature Stale"
+    id: remote_temp_stale
+    lambda: |-
+      unsigned long time_since_update = millis() - id(last_remote_temp_update);
+      return time_since_update > (${remote_temp_timeout} * 1000);
+    on_state:
+      then:
+        - script.execute: update_status_led
+    device_class: problem
+
+  # Remote humidity staleness indicator
+  - platform: template
+    name: "Remote Humidity Stale"
+    id: remote_humidity_stale
+    lambda: |-
+      unsigned long time_since_update = millis() - id(last_remote_humidity_update);
+      return time_since_update > (${remote_humidity_timeout} * 1000);
+    device_class: problem
+
+  # HVAC state indicators
+  - platform: template
+    name: "Heating Active"
+    id: heating_active
+    lambda: 'return id(heat_stage1_relay).state || id(heat_stage2_relay).state;'
+
+  - platform: template
+    name: "Cooling Active"
+    id: cooling_active
+    lambda: 'return id(cool_relay).state;'
+
+  - platform: template
+    name: "Stage 2 Active"
+    lambda: 'return id(heat_stage2_relay).state;'
+
+  # Humidifier safe to run indicator
+  - platform: template
+    name: "Humidifier Safe to Run"
+    id: humidifier_safe
+    lambda: |-
+      // Humidifier can ONLY run when:
+      // 1. System is in heating mode
+      // 2. Heat is actually running (stage 1 or 2)
+      // 3. Fan is running
+      // 4. NOT in cooling mode
+
+      bool heating_running = id(heat_stage1_relay).state || id(heat_stage2_relay).state;  // STAGE 2: Remove "|| id(heat_stage2_relay).state" if stage 2 disabled
+      bool fan_running = id(fan_relay).state;
+      bool not_cooling = !id(cool_relay).state;
+      bool climate_heating = id(smart_thermostat).mode == CLIMATE_MODE_HEAT;
+
+      return heating_running && fan_running && not_cooling && climate_heating;
+  
+  - platform: template
+    name: "HVAC Safety Interlock Active"
+    id: safety_interlock_active
+    device_class: safety
+    entity_category: diagnostic
+    lambda: |-
+      // Check if we are trying to Heat while Cool is still physically active
+      bool heat_waiting = (id(smart_thermostat).action == CLIMATE_ACTION_HEATING) && id(cool_relay).state;
+      
+      // Check if we are trying to Cool while Heat is still physically active
+      bool cool_waiting = (id(smart_thermostat).action == CLIMATE_ACTION_COOLING) &&
+                          (id(heat_stage1_relay).state || id(heat_stage2_relay).state);  // STAGE 2: Remove "|| id(heat_stage2_relay).state" if stage 2 disabled
+      
+      return heat_waiting || cool_waiting;
+
+
+# Switches for manual relay control

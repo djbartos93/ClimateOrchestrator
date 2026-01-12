@@ -1,0 +1,87 @@
+
+# 2. I2C Bus (For PCF8575 and RTC)
+i2c:
+  sda: GPIO42
+  scl: GPIO41
+  frequency: 100kHz
+  id: i2cbus
+  scan: false
+
+#pca9554 config for waveshare digital input
+pca9554:
+  - id: tca9554_hub
+    address: 0x20
+
+# 4. RTC (BM8563)
+time:
+  - platform: pcf8563
+    id: rtc_time
+  - platform: homeassistant
+    id: ha_time
+
+# 5. Buzzer (Active Buzzer on GPIO 7)
+output:
+  - platform: ledc
+    pin:
+      number: GPIO46
+      ignore_strapping_warning: true
+    id: buzzer_out
+
+rtttl:
+  output: buzzer_out
+  id: my_buzzer
+
+captive_portal:
+
+# LED configuration
+light:
+  - platform: esp32_rmt_led_strip
+    id: status_rgb
+    name: "RGB LED"
+    chipset: WS2812
+    rgb_order: RGB
+    pin: GPIO38
+    num_leds: 1
+    restore_mode: ALWAYS_OFF
+    effects:
+      - strobe:
+          name: "Fast Flash White"
+          colors:
+            - state: true
+              brightness: 100%
+              red: 1.0
+              green: 1.0
+              blue: 1.0
+              duration: 100ms
+            - state: false
+              duration: 100ms
+      - strobe:
+          name: "Heat + Humidifier Stage 1"
+          colors:
+            - state: true
+              brightness: 100%
+              red: 1.0
+              green: 0.5
+              blue: 0.0
+              duration: 750ms
+            - state: true
+              brightness: 100%
+              red: 1.0
+              green: 1.0
+              blue: 0.0
+              duration: 750ms
+      - strobe:
+          name: "Heat + Humidifier Stage 2"
+          colors:
+            - state: true
+              brightness: 100%
+              red: 1.0
+              green: 0.0
+              blue: 0.0
+              duration: 750ms
+            - state: true
+              brightness: 100%
+              red: 1.0
+              green: 1.0
+              blue: 0.0
+              duration: 750ms

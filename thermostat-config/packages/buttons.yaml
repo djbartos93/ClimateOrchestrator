@@ -1,0 +1,40 @@
+button:
+
+  - platform: restart
+    name: "Reboot Thermostat"
+    id: reboot_button
+    icon: "mdi:restart"
+
+# handels silencing the alarm when the API is out.
+  - platform: template
+    name: "Acknowledge API Outage"
+    icon: "mdi:check-circle-outline"
+    on_press:
+      - lambda: |-
+          id(alarm_acknowledged) = true;
+          ESP_LOGI("alarm", "API outage acknowledged - buzzer silenced");
+      - rtttl.stop:
+          id: my_buzzer
+
+# Reset filter runtime to zero after replacement
+  - platform: template
+    name: "Reset Filter Runtime"
+    icon: "mdi:air-filter"
+    on_press:
+      - lambda: |-
+          id(filter_runtime_minutes) = 0;
+          ESP_LOGI("filter", "Filter runtime counter reset to 0");
+
+  - platform: template
+    name: "Emergency Stop"
+    icon: "mdi:alert-octagon"
+    on_press:
+      - lambda: |-
+          ESP_LOGW("safety", "EMERGENCY STOP activated - all HVAC systems disabled");
+      - switch.turn_off: heat_stage1_relay
+      - switch.turn_off: heat_stage2_relay  # STAGE 2: Comment out this line if stage 2 disabled
+      - switch.turn_off: cool_relay
+      - switch.turn_off: fan_relay
+      - switch.turn_off: humidifier_relay
+
+# Interval checks for safety, monitoring, and runtime tracking

@@ -1,0 +1,296 @@
+# Thermostat Sensors Package
+# Template sensors for temperature/humidity averaging and status monitoring
+thermostat_stensors:
+  template:
+    - sensor:
+        # -----------------------------------------------------------------------
+        # Temperature Averaging
+        # -----------------------------------------------------------------------
+        - name: "Thermostat Average Temperature"
+          unique_id: "a3f2d8c4-1e5b-4a2f-9c3e-7d8f1a2b3c4d"
+          state_class: measurement
+          device_class: temperature
+          unit_of_measurement: "°C"
+          state: >
+            {# Map sensors to their enable/disable toggles #}
+            {% set sensor_map = {
+              'sensor.livingroom_zigbee_temperature_temperature': 'input_boolean.thermostat_use_living_room_temp',
+              'sensor.bedroom_zigbee_tempurature_temperature': 'input_boolean.thermostat_use_bedroom_temp',
+              'sensor.kitchen_zigbee_temperature_temperature': 'input_boolean.thermostat_use_kitchen_temp',
+              'sensor.office_zigbee_temperature_temperature': 'input_boolean.thermostat_use_office_temp'
+            } %}
+
+            {# Use a namespace to allow 'temps' to persist outside the loop #}
+            {% set ns = namespace(temps=[]) %}
+
+            {% for sensor, toggle in sensor_map.items() %}
+              {% if is_state(toggle, 'on') and states(sensor) | is_number %}
+                {% set ns.temps = ns.temps + [states(sensor) | float] %}
+              {% endif %}
+            {% endfor %}
+
+            {% if ns.temps | length > 0 %}
+              {# Calculate average #}
+              {% set avg_f = (ns.temps | sum / ns.temps | length) %}
+              {# Convert Fahrenheit to Celsius: (°F - 32) × 5/9 #}
+              {{ ((avg_f - 32) * 5 / 9) | round(1) }}
+            {% else %}
+              {# Fallback to local sensor #}
+              {{ states('sensor.smart_thermostat_local_temperature') | float(21) }}
+            {% endif %}
+        # -----------------------------------------------------------------------
+        # Humidity Averaging
+        # -----------------------------------------------------------------------
+        - name: "Thermostat Average Humidity"
+          unique_id: "b4e3c9d5-2f6c-4b3g-8d4f-1e9g2b3c4d5e"
+          state_class: measurement
+          device_class: humidity
+          unit_of_measurement: "%"
+          state: >
+            {# Map humidity sensors to the same toggles used for temperature #}
+            {% set sensor_map = {
+              'sensor.livingroom_zigbee_temperature_humidity': 'input_boolean.thermostat_use_living_room_temp',
+              'sensor.bedroom_zigbee_tempurature_humidity': 'input_boolean.thermostat_use_bedroom_temp',
+              'sensor.kitchen_zigbee_temperature_humidity': 'input_boolean.thermostat_use_kitchen_temp',
+              'sensor.office_zigbee_temperature_humidity': 'input_boolean.thermostat_use_office_temp'
+            } %}
+
+            {% set ns = namespace(humids=[]) %}
+
+            {% for sensor, toggle in sensor_map.items() %}
+              {# Check if the room's toggle is ON and the sensor has a valid number #}
+              {% if is_state(toggle, 'on') and states(sensor) | is_number %}
+                {% set ns.humids = ns.humids + [states(sensor) | float] %}
+              {% endif %}
+            {% endfor %}
+
+            {% if ns.humids | length > 0 %}
+              {{ (ns.humids | sum / ns.humids | length) | round(0) }}
+            {% else %}
+              {# Fallback to local sensor if no room toggles are on or sensors are offline #}
+              {{ states('sensor.smart_thermostat_local_humidity') | float(50) }}
+            {% endif %}
+        # -----------------------------------------------------------------------
+        # Humidifier Auto Setpoint (outdoor temperature based)
+        # -----------------------------------------------------------------------
+        - name: "Humidifier Auto Setpoint"
+          unique_id: "c5d4e0f6-3g7d-4c4h-9e5g-2f0h3c4d5e6f"
+          unit_of_measurement: "%"
+          icon: "mdi:water-percent"
+          state: >
+            {% set outdoor_temp = states('sensor.smart_thermostat_outdoor_temperature') | float(0) %}
+
+            {# 
+              Linear logic: At 20°F (-6°C), we want ~35%. At 0°F (-18°C), we want ~25%.
+              Formula: (Outdoor Temp + 20) / 2 + 25 (simplified example)
+              Or use a more precise Building Science slope:
+            #}
+
+            {% if outdoor_temp >= 10 %}
+              {% set target = 45 %}
+            {% elif outdoor_temp <= -20 %}
+              {% set target = 20 %}
+            {% else %}
+              {# This creates a smooth line between 20% at -20°C and 45% at 10°C #}
+              {% set target = ((outdoor_temp - (-20)) * (45 - 20) / (10 - (-20)) + 20) | round(0) %}
+            {% endif %}
+
+            {# Safety: Never exceed 45% and never drop below a healthy 20% #}
+            {{ [ [target, 45] | min, 20 ] | max }}
+
+        # -----------------------------------------------------------------------
+        # Humidifier Effective Setpoint (auto or manual)
+        # -----------------------------------------------------------------------
+        - name: "Humidifier Effective Setpoint"
+          unique_id: "d6e5f1g7-4h8e-5d5i-0f6h-3g1i4d5e6f7g"
+          unit_of_measurement: "%"
+          icon: "mdi:water-percent"
+          state: >
+            {% if is_state('input_boolean.humidifier_manual_setpoint', 'on') %}
+              {{ states('input_number.humidifier_manual_setpoint') | float }}
+            {% else %}
+              {{ states('sensor.humidifier_auto_setpoint') | float }}
+            {% endif %}
+
+        # -----------------------------------------------------------------------
+        # Ecobee Passthrough Status
+        # -----------------------------------------------------------------------
+        - name: "Thermostat Ecobee Passthrough Status"
+          unique_id: "e7f6g2h8-5i9f-6e6j-1g7i-4h2j5e6f7g8h"
+          state: >
+            {% if is_state('switch.smart_thermostat_ecobee_passthrough_mode', 'on') %}
+              Active - Ecobee Controlling
+            {% else %}
+              Inactive - Smart Thermostat Controlling
+            {% endif %}
+          icon: >
+            {% if is_state('switch.smart_thermostat_ecobee_passthrough_mode', 'on') %}
+              mdi:transit-connection-variant
+            {% else %}
+              mdi:chip
+            {% endif %}
+
+        # -----------------------------------------------------------------------
+        # System Mismatch Status
+        # -----------------------------------------------------------------------
+        - name: "Thermostat System Mismatch Status"
+          unique_id: "f8g7h3i9-6j0g-7f7k-2h8j-5i3k6f7g8h9i"
+          state: >
+            {% set ecobee_w1 = is_state('binary_sensor.smart_thermostat_ecobee_heat_stage_1_input', 'on') %}
+            {% set ecobee_w2 = is_state('binary_sensor.smart_thermostat_ecobee_heat_stage_2_input', 'on') %}
+            {% set ecobee_y1 = is_state('binary_sensor.smart_thermostat_ecobee_cooling_input', 'on') %}
+            {% set our_heating = is_state('binary_sensor.smart_thermostat_heating_active', 'on') %}
+            {% set our_cooling = is_state('binary_sensor.smart_thermostat_cooling_active', 'on') %}
+            {% set our_stage2 = is_state('binary_sensor.smart_thermostat_stage_2_active', 'on') %}
+            {% set passthrough = is_state('switch.smart_thermostat_ecobee_passthrough_mode', 'on') %}
+
+            {% if passthrough %}
+              Passthrough Mode - No Comparison
+            {% else %}
+              {% set mismatches = [] %}
+              {% if ecobee_w1 and not our_heating %}
+                {% set mismatches = mismatches + ['Ecobee calling for heat, we are not'] %}
+              {% endif %}
+              {% if ecobee_w2 and not our_stage2 %}
+                {% set mismatches = mismatches + ['Ecobee calling for stage 2, we are not'] %}
+              {% endif %}
+              {% if ecobee_y1 and not our_cooling %}
+                {% set mismatches = mismatches + ['Ecobee calling for cooling, we are not'] %}
+              {% endif %}
+              {% if our_heating and not ecobee_w1 %}
+                {% set mismatches = mismatches + ['We are calling for heat, ecobee is not'] %}
+              {% endif %}
+              {% if our_cooling and not ecobee_y1 %}
+                {% set mismatches = mismatches + ['We are calling for cooling, ecobee is not'] %}
+              {% endif %}
+
+              {% if mismatches | length > 0 %}
+                MISMATCH: {{ mismatches | join('; ') }}
+              {% else %}
+                Systems Synchronized
+              {% endif %}
+            {% endif %}
+          icon: >
+            {% set passthrough = is_state('switch.smart_thermostat_ecobee_passthrough_mode', 'on') %}
+            {% if passthrough %}
+              mdi:check-circle-outline
+            {% elif 'MISMATCH' in states('sensor.thermostat_system_mismatch_status') %}
+              mdi:alert-circle
+            {% else %}
+              mdi:check-circle
+            {% endif %}
+
+        # -----------------------------------------------------------------------
+        # Heating Cycles Last Hour (for excessive cycling detection)
+        # -----------------------------------------------------------------------
+        - name: "Thermostat Heating Cycles Last Hour"
+          unique_id: "g9h8i4j0-7k1h-8g8l-3i9k-6j4l7g8h9i0j"
+          state: "{{ states('counter.thermostat_heating_cycles_today') | int }}"
+          unit_of_measurement: "cycles"
+          icon: "mdi:fire"
+
+    - binary_sensor:
+        # -----------------------------------------------------------------------
+        # System Mismatch Detected (for automation triggering)
+        # -----------------------------------------------------------------------
+        - name: "Thermostat System Mismatch Detected"
+          unique_id: "h0i9j5k1-8l2i-9h9m-4j0l-7k5m8h9i0j1k"
+          state: "{{ 'MISMATCH' in states('sensor.thermostat_system_mismatch_status') }}"
+          device_class: problem
+
+        # -----------------------------------------------------------------------
+        # Everyone Away (occupancy sensor)
+        # CUSTOMIZE: Replace with your actual person entities
+        # -----------------------------------------------------------------------
+        - name: "Everyone Away"
+          unique_id: "i1j0k6l2-9m3j-0i0n-5k1m-8l6n9i0j1k2l"
+          state: >
+            {# CUSTOMIZE: Update these person entity IDs #}
+            {{ is_state('person.eric_bartos', 'not_home') and
+              is_state('person.seama', 'not_home') }}
+          device_class: occupancy
+  # History stats sensors for runtime tracking
+  sensor:
+    - platform: history_stats
+      name: "Heating Runtime Today"
+      unique_id: "j2k1l7m3-0n4k-1j1o-6l2n-9m7o0j1k2l3m"
+      entity_id: binary_sensor.smart_thermostat_heating_active
+      state: "on"
+      type: time
+      start: "{{ now().replace(hour=0, minute=0, second=0) }}"
+      end: "{{ now() }}"
+
+    - platform: history_stats
+      name: "Cooling Runtime Today"
+      unique_id: "k3l2m8n4-1o5l-2k2p-7m3o-0n8p1k2l3m4n"
+      entity_id: binary_sensor.smart_thermostat_cooling_active
+      state: "on"
+      type: time
+      start: "{{ now().replace(hour=0, minute=0, second=0) }}"
+      end: "{{ now() }}"
+
+    - platform: history_stats
+      name: "Humidifier Runtime Today"
+      unique_id: "l4m3n9o5-2p6m-3l3q-8n4p-1o9q2l3m4n5o"
+      entity_id: switch.smart_thermostat_humidifier_relay
+      state: "on"
+      type: time
+      start: "{{ now().replace(hour=0, minute=0, second=0) }}"
+      end: "{{ now() }}"
+
+    - platform: history_stats
+      name: "Smart Thermostat Control Time Today"
+      unique_id: "m5n4o0p6-3q7n-4m4r-9o5q-2p0r3m4n5o6p"
+      entity_id: switch.smart_thermostat_ecobee_passthrough_mode
+      state: "off"
+      type: time
+      start: "{{ now().replace(hour=0, minute=0, second=0) }}"
+      end: "{{ now() }}"
+
+    - platform: history_stats
+      name: "Ecobee Control Time Today"
+      unique_id: "n6o5p1q7-4r8o-5n5s-0p6r-3q1s4n5o6p7q"
+      entity_id: switch.smart_thermostat_ecobee_passthrough_mode
+      state: "on"
+      type: time
+      start: "{{ now().replace(hour=0, minute=0, second=0) }}"
+      end: "{{ now() }}"
+
+    # -------------------------------------------------------------------------
+    # AI Learning Sensors - Weekly Performance Tracking
+    # -------------------------------------------------------------------------
+    - platform: history_stats
+      name: "Heating Runtime This Week"
+      unique_id: "o7p6q2r8-5s9p-6o6t-1q7s-4r2t5o6p7q8r"
+      entity_id: binary_sensor.smart_thermostat_heating_active
+      state: "on"
+      type: time
+      start: "{{ now().replace(hour=0, minute=0, second=0) - timedelta(days=now().weekday()) }}"
+      end: "{{ now() }}"
+
+    - platform: history_stats
+      name: "Heating Cycles This Week"
+      unique_id: "p8q7r3s9-6t0q-7p7u-2r8t-5s3u6p7q8r9s"
+      entity_id: binary_sensor.smart_thermostat_heating_active
+      state: "on"
+      type: count
+      start: "{{ now().replace(hour=0, minute=0, second=0) - timedelta(days=now().weekday()) }}"
+      end: "{{ now() }}"
+
+    - platform: history_stats
+      name: "Stage 2 Runtime This Week"
+      unique_id: "q9r8s4t0-7u1r-8q8v-3s9u-6t4v7q8r9s0t"
+      entity_id: binary_sensor.smart_thermostat_stage_2_active
+      state: "on"
+      type: time
+      start: "{{ now().replace(hour=0, minute=0, second=0) - timedelta(days=now().weekday()) }}"
+      end: "{{ now() }}"
+
+    - platform: statistics
+      name: "Outdoor Temperature Avg Week"
+      unique_id: "r0s9t5u1-8v2s-9r9w-4t0v-7u5w8r9s0t1u"
+      entity_id: sensor.smart_thermostat_outdoor_temperature
+      state_characteristic: mean
+      sampling_size: 1000
+      max_age:
+        days: 7

@@ -1,0 +1,632 @@
+- id: "thermostat_data_and_control"
+  alias: "Thermostat: Data & Control"
+  description: Handles all data pushing and climate mode changes
+  triggers:
+    - entity_id: sensor.thermostat_average_temperature
+      id: temp_changed
+      trigger: state
+    - minutes: /1
+      id: temp_heartbeat
+      trigger: time_pattern
+    - entity_id: sensor.thermostat_average_humidity
+      id: humidity_changed
+      trigger: state
+    - entity_id: sensor.humidifier_effective_setpoint
+      id: setpoint_changed
+      trigger: state
+    - minutes: /5
+      id: setpoint_heartbeat
+      trigger: time_pattern
+    - entity_id:
+        - climate.main_floor
+      id: ecobee_temp_changed
+      trigger: state
+      attribute: current_temperature
+    - entity_id: binary_sensor.everyone_away
+      to: "on"
+      for:
+        minutes: 15
+      id: mode_away
+      trigger: state
+    - entity_id: binary_sensor.everyone_away
+      to: "off"
+      id: mode_home
+      trigger: state
+    - at: "22:00:00"
+      id: mode_sleep
+      trigger: time
+    - at: 06:30:00
+      id: mode_morning
+      trigger: time
+      weekday:
+        - mon
+        - tue
+        - wed
+        - thu
+        - fri
+    - at: 08:00:00
+      id: mode_morning
+      trigger: time
+      weekday:
+        - sun
+        - sat
+    - entity_id: input_select.house_mode
+      to: Vacation
+      id: passthrough_enable
+      trigger: state
+    - entity_id: input_select.house_mode
+      from: Vacation
+      id: passthrough_disable
+      trigger: state
+    - entity_id: switch.smart_thermostat_ecobee_passthrough_mode
+      id: passthrough_changed
+      trigger: state
+    - at: 05:00:00
+      id: weather_morning
+      trigger: time
+    - at: "17:00:00"
+      id: weather_evening
+      trigger: time
+    - entity_id: sensor.smart_thermostat_outdoor_temperature
+      below: -10
+      id: weather_very_cold
+      trigger: numeric_state
+    - entity_id: sensor.smart_thermostat_outdoor_temperature
+      above: 35
+      id: weather_heat_wave
+      trigger: numeric_state
+    - trigger: state
+      entity_id:
+        - sensor.main_floor_temperature
+      id: ecobee_temp_change
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id:
+                - temp_changed
+                - temp_heartbeat
+                - ecobee_temp_change
+            - condition: template
+              value_template:
+                "{{ states('sensor.thermostat_average_temperature') not
+                in ['unknown', 'unavailable'] }}"
+            - condition: state
+              entity_id: binary_sensor.smart_thermostat_status
+              state: "on"
+          sequence:
+            - data:
+                temperature:
+                  "{{ states('sensor.thermostat_average_temperature') | float
+                  }}"
+              action: esphome.smart_thermostat_set_remote_temperature
+            - data:
+                temperature:
+                  "{{ ((states('sensor.main_floor_temperature') | float - 32)
+                  * 5 / 9) | round(1) }}"
+              action: esphome.smart_thermostat_set_ecobee_temperature
+            - data:
+                humidity: "{{ states('sensor.thermostat_average_humidity') | float }}"
+              action: esphome.smart_thermostat_set_remote_humidity
+        - conditions:
+            - condition: trigger
+              id:
+                - humidity_changed
+            - condition: template
+              value_template:
+                "{{ states('sensor.thermostat_average_humidity') not in
+                ['unknown', 'unavailable'] }}"
+            - condition: state
+              entity_id: binary_sensor.smart_thermostat_status
+              state: "on"
+          sequence:
+            - data:
+                humidity: "{{ states('sensor.thermostat_average_humidity') | float }}"
+              action: esphome.smart_thermostat_set_remote_humidity
+        - conditions:
+            - condition: trigger
+              id:
+                - setpoint_changed
+            - condition: template
+              value_template:
+                "{{ states('sensor.humidifier_effective_setpoint') not in
+                ['unknown', 'unavailable'] }}"
+            - condition: state
+              entity_id: binary_sensor.smart_thermostat_status
+              state: "on"
+          sequence:
+            - data:
+                setpoint: "{{ states('sensor.humidifier_effective_setpoint') | float }}"
+              action: esphome.smart_thermostat_set_humidifier_setpoint
+        - conditions:
+            - condition: trigger
+              id:
+                - ecobee_temp_changed
+                - temp_heartbeat
+            - condition: template
+              value_template:
+                "{{ states('sensor.main_floor_temperature') not in ['unknown',
+                'unavailable'] }}"
+          sequence:
+            - delay:
+                hours: 0
+                minutes: 0
+                seconds: 0
+                milliseconds: 1
+            - data:
+                temperature:
+                  "{{ ((states('sensor.main_floor_temperature') | float - 32)
+                  * 5 / 9) | round(1) }}"
+              action: esphome.smart_thermostat_set_ecobee_temperature
+        - conditions:
+            - condition: trigger
+              id: mode_away
+          sequence:
+            - target:
+                entity_id: climate.smart_thermostat
+              data:
+                preset_mode: Away
+              action: climate.set_preset_mode
+            - data:
+                title: Thermostat Away Mode
+                message: Everyone left - energy saving mode activated
+              action: notify.notify
+        - conditions:
+            - condition: trigger
+              id: mode_home
+          sequence:
+            - target:
+                entity_id: climate.smart_thermostat
+              data:
+                preset_mode: home
+              action: climate.set_preset_mode
+            - data:
+                title: Thermostat Home Mode
+                message: Welcome home - comfort mode restored
+              action: notify.notify
+        - conditions:
+            - condition: trigger
+              id: mode_sleep
+            - condition: state
+              entity_id: binary_sensor.everyone_away
+              state: "off"
+          sequence:
+            - target:
+                entity_id: climate.smart_thermostat
+              data:
+                preset_mode: Sleep
+              action: climate.set_preset_mode
+        - conditions:
+            - condition: trigger
+              id: mode_morning
+            - condition: state
+              entity_id: binary_sensor.everyone_away
+              state: "off"
+          sequence:
+            - target:
+                entity_id: climate.smart_thermostat
+              data:
+                preset_mode: home
+              action: climate.set_preset_mode
+        - conditions:
+            - condition: trigger
+              id: passthrough_enable
+            - condition: state
+              entity_id: input_boolean.ecobee_passthrough_on_vacation
+              state: "on"
+          sequence:
+            - target:
+                entity_id: climate.smart_thermostat
+              data:
+                hvac_mode: "off"
+              action: climate.set_hvac_mode
+            - delay: 00:00:02
+            - target:
+                entity_id: switch.smart_thermostat_ecobee_passthrough_mode
+              action: switch.turn_on
+              data: {}
+            - data:
+                title: Ecobee Passthrough Enabled
+                message: Vacation mode - Ecobee controlling HVAC
+              action: notify.notify
+        - conditions:
+            - condition: trigger
+              id: passthrough_disable
+            - condition: state
+              entity_id: input_boolean.ecobee_passthrough_on_vacation
+              state: "on"
+            - condition: state
+              entity_id: switch.smart_thermostat_ecobee_passthrough_mode
+              state: "on"
+          sequence:
+            - target:
+                entity_id: switch.smart_thermostat_ecobee_passthrough_mode
+              action: switch.turn_off
+              data: {}
+            - data:
+                title: Ecobee Passthrough Disabled
+                message: Welcome home - Smart thermostat resumed control
+              action: notify.notify
+        - conditions:
+            - condition: trigger
+              id: passthrough_changed
+          sequence:
+            - data:
+                name: Thermostat Passthrough
+                message:
+                  "Passthrough {{ trigger.to_state.state }} {% if trigger.to_state.state
+                  == 'on' %}(Ecobee controlling) {% else %}(Smart thermostat controlling){%
+                  endif %}
+
+                  "
+              action: logbook.log
+        - conditions:
+            - condition: trigger
+              id:
+                - weather_very_cold
+                - weather_morning
+            - condition: numeric_state
+              entity_id: sensor.smart_thermostat_outdoor_temperature
+              below: -10
+            - condition: state
+              entity_id: climate.smart_thermostat
+              state: heat
+          sequence:
+            - target:
+                entity_id: climate.smart_thermostat
+              data:
+                temperature:
+                  "{{ state_attr('climate.smart_thermostat', 'temperature')
+                  | float + 1 }}"
+              action: climate.set_temperature
+            - data:
+                title: Thermostat Pre-heating
+                message:
+                  Very cold ({{ states('sensor.smart_thermostat_outdoor_temperature')
+                  }}°C) - increased heat by 1°
+              action: notify.notify
+        - conditions:
+            - condition: trigger
+              id:
+                - weather_heat_wave
+                - weather_evening
+            - condition: numeric_state
+              entity_id: sensor.smart_thermostat_outdoor_temperature
+              above: 35
+            - condition: state
+              entity_id: climate.smart_thermostat
+              state: cool
+          sequence:
+            - target:
+                entity_id: climate.smart_thermostat
+              data:
+                temperature:
+                  "{{ state_attr('climate.smart_thermostat', 'temperature')
+                  | float + 1 }}"
+              action: climate.set_temperature
+            - data:
+                title: Heat Wave Adjustment
+                message:
+                  Extreme heat ({{ states('sensor.smart_thermostat_outdoor_temperature')
+                  }}°C) - increased cooling setpoint
+              action: notify.notify
+  mode: queued
+  max: 10
+
+
+- id: "thermostat_alerts_and_monitoring"
+  alias: "Thermostat: Alerts & Monitoring"
+  description:
+    All safety alerts, system problems, runtime monitoring, and mismatch
+    detection
+  triggers:
+    - value_template:
+        "{{ is_state('switch.smart_thermostat_humidifier_relay', 'on')
+        and is_state('binary_sensor.smart_thermostat_cooling_active', 'on') }}"
+      id: emergency_humidifier_cooling
+      trigger: template
+    - value_template:
+        "{{ is_state('switch.smart_thermostat_humidifier_relay', 'on')
+        and is_state('binary_sensor.smart_thermostat_humidifier_safe', 'off') }}"
+      for:
+        seconds: 30
+      id: alert_humidifier_unsafe
+      trigger: template
+    - entity_id: sensor.thermostat_average_humidity
+      above: 60
+      for:
+        hours: 1
+      id: alert_high_humidity
+      trigger: numeric_state
+    - entity_id: sensor.thermostat_average_humidity
+      below: 25
+      for:
+        hours: 2
+      id: alert_low_humidity
+      trigger: numeric_state
+    - entity_id: binary_sensor.smart_thermostat_heating_active
+      to: "on"
+      for:
+        hours: 3
+      id: alert_heating_too_long
+      trigger: state
+    - entity_id: binary_sensor.smart_thermostat_cooling_active
+      to: "on"
+      for:
+        hours: 3
+      id: alert_cooling_too_long
+      trigger: state
+    - entity_id: binary_sensor.smart_thermostat_remote_temperature_stale
+      to: "on"
+      for:
+        minutes: 10
+      id: alert_temp_stale
+      trigger: state
+    - entity_id: binary_sensor.smart_thermostat_status
+      to: "off"
+      for:
+        minutes: 5
+      id: alert_device_offline
+      trigger: state
+    - entity_id: sensor.smart_thermostat_outdoor_temperature
+      to: unavailable
+      for:
+        hours: 1
+      id: alert_outdoor_missing
+      trigger: state
+    - entity_id: sensor.thermostat_heating_cycles_last_hour
+      above: 6
+      id: alert_excessive_cycling
+      trigger: numeric_state
+    - entity_id: binary_sensor.thermostat_system_mismatch_detected
+      to: "on"
+      for:
+        minutes: 5
+      id: alert_mismatch
+      trigger: state
+    - entity_id: binary_sensor.thermostat_system_mismatch_detected
+      to: "off"
+      for:
+        minutes: 2
+      id: alert_mismatch_cleared
+      trigger: state
+    - entity_id: binary_sensor.smart_thermostat_heating_active
+      from: "on"
+      to: "off"
+      id: track_heating_cycle
+      trigger: state
+    - entity_id: binary_sensor.smart_thermostat_cooling_active
+      from: "on"
+      to: "off"
+      id: track_cooling_cycle
+      trigger: state
+    - minutes: /5
+      id: track_humidifier_runtime
+      trigger: time_pattern
+    - at: 00:00:00
+      id: track_daily_reset
+      trigger: time
+    - entity_id: switch.smart_thermostat_maintenance_mode
+      to: "on"
+      id: maintenance_enabled
+      trigger: state
+    - entity_id: switch.smart_thermostat_maintenance_mode
+      to: "off"
+      id: maintenance_disabled
+      trigger: state
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: emergency_humidifier_cooling
+          sequence:
+            - target:
+                entity_id: switch.smart_thermostat_humidifier_relay
+              action: switch.turn_off
+            - data:
+                title: "⚠️ CRITICAL: Humidifier Emergency Shutoff"
+                message:
+                  Humidifier was running during cooling! Automatically shut off.
+                  Check system immediately.
+              action: notify.notify
+            - data:
+                title: "\U0001F6A8 Humidifier Safety Event"
+                message:
+                  "Humidifier was running while AC was on. This should never happen.
+                  Automatic action: Humidifier turned OFF. Please verify system operation."
+              action: persistent_notification.create
+        - conditions:
+            - condition: trigger
+              id: alert_humidifier_unsafe
+          sequence:
+            - data:
+                title: Humidifier Unsafe Operation
+                message: Humidifier running without proper heat+fan conditions
+              action: notify.notify
+        - conditions:
+            - condition: trigger
+              id: alert_high_humidity
+          sequence:
+            - data:
+                title: High Humidity Alert
+                message:
+                  Indoor humidity {{ states('sensor.thermostat_average_humidity')
+                  }}% - consider reducing setpoint
+              action: notify.notify
+        - conditions:
+            - condition: trigger
+              id: alert_low_humidity
+            - condition: state
+              entity_id: climate.smart_thermostat
+              state: heat
+          sequence:
+            - data:
+                title: Low Humidity Alert
+                message:
+                  Indoor humidity {{ states('sensor.thermostat_average_humidity')
+                  }}% - consider increasing setpoint
+              action: notify.notify
+        - conditions:
+            - condition: trigger
+              id: alert_heating_too_long
+          sequence:
+            - data:
+                title: Heating Running Too Long
+                message: Heat has been running for 3+ hours. Check system operation.
+              action: notify.notify
+        - conditions:
+            - condition: trigger
+              id: alert_cooling_too_long
+          sequence:
+            - data:
+                title: Cooling Running Too Long
+                message: AC has been running for 3+ hours. Check system operation.
+              action: notify.notify
+        - conditions:
+            - condition: trigger
+              id: alert_temp_stale
+          sequence:
+            - data:
+                title: Temperature Sensors Offline
+                message: Remote temperature stale. Using local backup sensor.
+              action: notify.notify
+        - conditions:
+            - condition: trigger
+              id: alert_device_offline
+          sequence:
+            - data:
+                title: ⚠️ Thermostat Offline
+                message: Smart thermostat offline for 5+ minutes. HVAC control may be lost.
+              action: notify.notify
+        - conditions:
+            - condition: trigger
+              id: alert_outdoor_missing
+          sequence:
+            - data:
+                title: Outdoor Data Missing
+                message: Outdoor temperature unavailable - humidifier using default setpoint
+              action: notify.notify
+        - conditions:
+            - condition: trigger
+              id: alert_excessive_cycling
+          sequence:
+            - data:
+                title: Excessive HVAC Cycling
+                message:
+                  System cycled {{ states('sensor.thermostat_heating_cycles_last_hour')
+                  }} times in last hour. Check deadband settings.
+              action: notify.notify
+        - conditions:
+            - condition: trigger
+              id: alert_mismatch
+            - condition: state
+              entity_id: switch.smart_thermostat_ecobee_passthrough_mode
+              state: "off"
+          sequence:
+            - data:
+                title: Thermostat System Mismatch
+                message: "{{ states('sensor.thermostat_system_mismatch_status') }}"
+              action: notify.notify
+            - data:
+                title: ⚠️ Thermostat Mismatch
+                message:
+                  "{{ states('sensor.thermostat_system_mismatch_status') }}
+
+                  Ecobee: Heat1={{ states('binary_sensor.smart_thermostat_ecobee_heat_stage_1_input')
+                  }} Heat2={{ states('binary_sensor.smart_thermostat_ecobee_heat_stage_2_input')
+                  }} Cool={{ states('binary_sensor.smart_thermostat_ecobee_cooling_input')
+                  }}
+
+                  Smart: Heat={{ states('binary_sensor.smart_thermostat_heating_active')
+                  }} Cool={{ states('binary_sensor.smart_thermostat_cooling_active') }}
+
+                  "
+              action: persistent_notification.create
+        - conditions:
+            - condition: trigger
+              id: alert_mismatch_cleared
+          sequence:
+            - data:
+                title: Systems Synchronized
+                message: Ecobee and Smart Thermostat now in agreement
+              action: notify.notify
+        - conditions:
+            - condition: trigger
+              id: maintenance_enabled
+          sequence:
+            - data:
+                title: "\U0001F527 Maintenance Mode Enabled"
+                message:
+                  Manual relay control active. Auto-disable in 30 minutes unless
+                  overridden.
+              action: notify.notify
+            - data:
+                title: "\U0001F527 Maintenance Mode Active"
+                message:
+                  "Manual relay control is now active. Normal thermostat operation
+                  is disabled.
+
+                  Auto-disable: 30 minutes (unless Keep Enabled is ON)
+
+                  Available controls: - Heat Stage 1 - Heat Stage 2 - Cooling - Fan
+
+                  "
+              action: persistent_notification.create
+        - conditions:
+            - condition: trigger
+              id: maintenance_disabled
+          sequence:
+            - data:
+                title: ✅ Maintenance Mode Disabled
+                message: Normal thermostat operation resumed.
+              action: notify.notify
+            - data:
+                notification_id: maintenance_mode_active
+              action: persistent_notification.dismiss
+        - conditions:
+            - condition: trigger
+              id: track_heating_cycle
+          sequence:
+            - target:
+                entity_id: counter.thermostat_heating_cycles_today
+              action: counter.increment
+            - data:
+                name: HVAC Cycle
+                message:
+                  "Heating cycle completed. Duration: {{ relative_time(trigger.from_state.last_changed)
+                  }}"
+              action: logbook.log
+        - conditions:
+            - condition: trigger
+              id: track_cooling_cycle
+          sequence:
+            - target:
+                entity_id: counter.thermostat_cooling_cycles_today
+              action: counter.increment
+            - data:
+                name: HVAC Cycle
+                message:
+                  "Cooling cycle completed. Duration: {{ relative_time(trigger.from_state.last_changed)
+                  }}"
+              action: logbook.log
+        - conditions:
+            - condition: trigger
+              id: track_humidifier_runtime
+            - condition: state
+              entity_id: switch.smart_thermostat_humidifier_relay
+              state: "on"
+          sequence:
+            - target:
+                entity_id: counter.humidifier_runtime_minutes
+              action: counter.increment
+        - conditions:
+            - condition: trigger
+              id: track_daily_reset
+          sequence:
+            - target:
+                entity_id:
+                  - counter.thermostat_heating_cycles_today
+                  - counter.thermostat_cooling_cycles_today
+              action: counter.reset
+  mode: parallel
+  max: 20

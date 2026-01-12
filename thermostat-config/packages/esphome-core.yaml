@@ -1,0 +1,96 @@
+# Log levels configured via substitutions at top of file
+logger:
+  level: ${log_level_default}
+  logs:
+    climate: ${log_level_climate}
+    dht: ${log_level_dht}
+    sensor: ${log_level_sensor}
+    humidifier: ${log_level_humidifier}
+    light: ${log_level_light}
+
+# Syslog - Send logs to remote syslog server
+# UNCOMMENT the lines below to enable syslog logging
+# Requires UDP and Time components (Time is already configured)
+#udp:
+#  addresses: ${syslog_server}
+#
+#syslog:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret api_encryption_key
+  services:
+    # Service to receive remote temperature from Home Assistant
+    - service: set_remote_temperature
+      variables:
+        temperature: float
+      then:
+        - lambda: |-
+            id(remote_temperature_override).publish_state(temperature);
+            id(last_remote_temp_update) = millis();
+            ESP_LOGI("remote_temp", "Received remote temperature: %.1f°C", temperature);
+        - script.execute: update_status_led
+
+    # Service to receive remote humidity from Home Assistant
+    - service: set_remote_humidity
+      variables:
+        humidity: float
+      then:
+        - lambda: |-
+            id(remote_humidity_override).publish_state(humidity);
+            id(last_remote_humidity_update) = millis();
+            ESP_LOGI("remote_humidity", "Received remote humidity: %.1f%%", humidity);
+            // Update humidifier state after receiving new humidity
+            id(update_humidifier_state).execute();
+
+    # Service to set humidifier setpoint from HA
+    - service: set_humidifier_setpoint
+      variables:
+        setpoint: float
+      then:
+        - lambda: |-
+            id(humidifier_setpoint_override).publish_state(setpoint);
+            ESP_LOGI("humidifier", "Received humidifier setpoint: %.0f%%", setpoint);
+            id(update_humidifier_state).execute();
+
+    # Service to receive ecobee temperature for backup sensor
+    - service: set_ecobee_temperature
+      variables:
+        temperature: float
+      then:
+        - lambda: |-
+            id(ecobee_temperature_sensor).publish_state(temperature);
+            ESP_LOGI("ecobee", "Received ecobee temperature: %.1f°C", temperature);
+
+# Enable OTA updates
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# Enable Web Server for local control
+web_server:
+  port: 80
+  version: 3
+  # Load dashboard layout fix from GitHub
+  # js_include: "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/layout.js"
+  js_include: "layout.js"
+  sorting_groups:
+    - id: group_climate
+      name: "🌡️ Climate Control"
+      sorting_weight: 1
+    - id: group_temp_sensors
+      name: "🔍 Temperature Details"
+      sorting_weight: 2
+    - id: group_humidifier
+      name: "💧 Humidity & Humidifier"
+      sorting_weight: 3
+    - id: group_overrides
+      name: "⚙️ System Overrides & Modes"
+      sorting_weight: 4
+    - id: group_runtimes
+      name: "📊 Runtimes & Health"
+      sorting_weight: 5
+    - id: group_maintenance
+      name: "🛠️ Maintenance (RELAYS)"
+      sorting_weight: 6

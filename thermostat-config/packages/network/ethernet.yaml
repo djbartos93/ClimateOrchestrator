@@ -1,0 +1,14 @@
+# Ethernet Network Configuration (W5500)
+ethernet:
+  type: W5500
+  clk_pin: 39
+  mosi_pin: 40
+  miso_pin: 41
+  cs_pin: 42
+  interrupt_pin: 2
+  reset_pin: 1
+  on_connect:
+    then:
+      - rtttl.play: "wifi:d=8,o=6,b=200:g,g"
+      - lambda: |-
+          ESP_LOGI("network", "Ethernet connection established");

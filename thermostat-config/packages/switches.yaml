@@ -1,0 +1,385 @@
+switch:
+
+  - platform: template
+    name: "Mute API Alarm"
+    id: mute_api_alarm
+    icon: "mdi:volume-off"
+    web_server:
+      sorting_group_id: group_overrides
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      - lambda: |-
+          ESP_LOGI("alarm", "API alarm muted");
+    on_turn_off:
+      - lambda: |-
+          ESP_LOGI("alarm", "API alarm unmuted");
+
+  - platform: gpio
+    pin:
+      pca9554: tca9554_hub
+      number: 0
+      mode:
+        output: true
+    id: heat_stage1_relay
+    inverted: true
+    name: "Heat Stage 1 Relay"
+    internal: true
+    on_turn_on:
+      - lambda: 'id(heat_stage1_start_time) = millis();'
+      # Check humidifier when heating starts
+      - script.execute: update_humidifier_state
+    on_turn_off:
+      - lambda: 'id(heat_stage1_start_time) = 0;'
+      # Turn off humidifier when heating stops
+      - script.execute: update_humidifier_state
+
+  # STAGE 2: Heat Stage 2 Relay - Comment out this entire section to disable stage 2 heating
+  - platform: gpio
+    pin:
+      pca9554: tca9554_hub
+      number: 1
+      mode:
+        output: true
+    id: heat_stage2_relay
+    inverted: true
+    name: "Heat Stage 2 Relay"
+    internal: true
+    on_turn_on:
+      - lambda: |-
+          id(heat_stage2_start_time) = millis();
+          ESP_LOGI("hvac", "Heat Stage 2 engaged - deep heating mode");
+    on_turn_off:
+      - lambda: |-
+          id(heat_stage2_start_time) = 0;
+          ESP_LOGI("hvac", "Heat Stage 2 disengaged");
+
+  - platform: gpio
+    pin:
+      pca9554: tca9554_hub
+      number: 2
+      mode:
+        output: true
+    id: cool_relay
+    inverted: true
+    name: "Cool Relay"
+    internal: true
+    on_turn_on:
+      - lambda: |-
+          id(cool_start_time) = millis();
+          ESP_LOGI("hvac", "Compressor started - cooling mode");
+      # CRITICAL: Turn off humidifier when cooling starts
+      - switch.turn_off: humidifier_relay
+    on_turn_off:
+      - lambda: |-
+          id(cool_start_time) = 0;
+          id(last_compressor_stop_time) = millis();
+          ESP_LOGI("hvac", "Compressor stopped - entering lockout period");
+
+  - platform: gpio
+    pin:
+      pca9554: tca9554_hub
+      number: 3
+      mode:
+        output: true
+    id: fan_relay
+    inverted: true
+    name: "Fan Relay"
+    internal: true
+    restore_mode: ALWAYS_OFF #preventing fan from turning on when restarted
+    on_turn_on:
+      - script.execute: update_humidifier_state
+    on_turn_off:
+      - script.execute: update_humidifier_state
+
+  # Humidifier relay with manual override capability
+  - platform: gpio
+    pin:
+      pca9554: tca9554_hub
+      number: 4
+      mode:
+        output: true
+    id: humidifier_relay
+    inverted: true
+    name: "Humidifier Relay"
+    icon: "mdi:air-humidifier"
+    web_server:
+      sorting_group_id: group_humidifier
+    # NOT internal - can be manually controlled for testing
+    # But will be overridden by automation unless manual control is enabled
+    restore_mode: ALWAYS_OFF  # Always start in off state for safety (preventing leaks)
+    on_turn_on:
+      - lambda: |-
+          ESP_LOGI("humidifier", "Humidifier ON - Current: %.0f%%, Setpoint: %.0f%%",
+                   id(effective_humidity).state, id(humidifier_setpoint_override).state);
+    on_turn_off:
+      - lambda: |-
+          ESP_LOGI("humidifier", "Humidifier OFF");
+
+  # Manual override switch for humidifier
+  - platform: template
+    name: "Humidifier Manual Control"
+    id: humidifier_manual_control
+    icon: "mdi:hand-back-right"
+    web_server:
+      sorting_group_id: group_humidifier
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      - lambda: |-
+          ESP_LOGI("humidifier", "Manual control enabled - automation disabled");
+    on_turn_off:
+      - lambda: |-
+          ESP_LOGI("humidifier", "Auto control enabled");
+      - script.execute: update_humidifier_state
+
+  # Complete disable switch for humidifier
+  - platform: template
+    name: "Humidifier Enable"
+    id: humidifier_enable
+    icon: "mdi:water-check"
+    web_server:
+      sorting_group_id: group_humidifier
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    on_turn_on:
+      - lambda: |-
+          ESP_LOGI("humidifier", "System enabled");
+      - script.execute: update_humidifier_state
+    on_turn_off:
+      - lambda: |-
+          ESP_LOGI("humidifier", "System disabled");
+      - switch.turn_off: humidifier_relay
+
+  # Ecobee passthrough mode - relays mirror ecobee outputs
+  - platform: template
+    name: "Ecobee Passthrough Mode"
+    id: ecobee_passthrough_mode
+    icon: "mdi:transit-connection-variant"
+    web_server:
+      sorting_group_id: group_overrides
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      - lambda: |-
+          ESP_LOGI("ecobee", "Passthrough mode enabled - thermostat logic bypassed");
+          id(passthrough_mode_active) = true;
+      - script.execute: update_passthrough_relays
+    on_turn_off:
+      - lambda: |-
+          ESP_LOGI("ecobee", "Passthrough mode disabled - normal operation");
+          id(passthrough_mode_active) = false;
+
+  # Use ecobee temperature as primary sensor
+  - platform: template
+    name: "Use Ecobee Temperature"
+    id: use_ecobee_temp
+    icon: "mdi:thermometer-lines"
+    web_server:
+      sorting_group_id: group_overrides
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      - lambda: |-
+          ESP_LOGI("sensor", "Ecobee temperature enabled as primary source");
+      - component.update: effective_temperature
+      - component.update: compensated_temperature
+      - script.execute: update_status_led
+    on_turn_off:
+      - lambda: |-
+          ESP_LOGI("sensor", "Ecobee temperature disabled");
+      - component.update: effective_temperature
+      - component.update: compensated_temperature
+      - script.execute: update_status_led
+
+  # Use "feels like" temperature compensation
+  - platform: template
+    name: "Use Feels Like Temperature"
+    id: use_feels_like_temp
+    icon: "mdi:sun-thermometer"
+    web_server:
+      sorting_group_id: group_overrides
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      - lambda: |-
+          ESP_LOGI("sensor", "Feels like compensation enabled");
+      - component.update: compensated_temperature
+    on_turn_off:
+      - lambda: |-
+          ESP_LOGI("sensor", "Feels like compensation disabled");
+      - component.update: compensated_temperature
+
+  # ============================================================================
+  # MAINTENANCE MODE - Manual control with auto-disable safety
+  # ============================================================================
+  # Master maintenance mode switch
+  - platform: template
+    name: "Maintenance Mode"
+    id: maintenance_mode
+    icon: "mdi:wrench"
+    web_server:
+      sorting_group_id: group_maintenance
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      - lambda: |-
+          ESP_LOGW("maintenance", "Maintenance mode enabled - manual relay control active");
+          id(maintenance_mode_start_time) = millis();
+      # Disable climate control when entering maintenance mode
+      - climate.control:
+          id: smart_thermostat
+          mode: "OFF"
+    on_turn_off:
+      - lambda: |-
+          ESP_LOGI("maintenance", "Maintenance mode disabled - normal operation resumed");
+          id(maintenance_mode_start_time) = 0;
+
+  # Override auto-disable timer
+  - platform: template
+    name: "Maintenance Mode Keep Enabled"
+    id: maintenance_mode_keep_enabled
+    icon: "mdi:timer-off"
+    web_server:
+      sorting_group_id: group_maintenance
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      - lambda: |-
+          ESP_LOGW("maintenance", "Auto-disable timer overridden");
+    on_turn_off:
+      - lambda: |-
+          ESP_LOGI("maintenance", "Auto-disable timer active (30 min)");
+
+  # Manual relay control switches (only active in maintenance mode)
+  - platform: template
+    name: "Maintenance Heat Stage 1"
+    id: maintenance_heat1
+    icon: "mdi:fire"
+    web_server:
+      sorting_group_id: group_maintenance
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - if:
+          condition:
+            - switch.is_on: maintenance_mode
+          then:
+            # Safety: Turn off cooling before enabling heat
+            - if:
+                condition:
+                  - switch.is_on: cool_relay
+                then:
+                  - switch.turn_off: cool_relay
+                  - lambda: |-
+                      ESP_LOGW("maintenance", "Safety interlock: Cooling disabled before heat");
+            - switch.turn_on: heat_stage1_relay
+            - lambda: |-
+                ESP_LOGI("maintenance", "Manual control: Heat Stage 1 ON");
+    turn_off_action:
+      - if:
+          condition:
+            - switch.is_on: maintenance_mode
+          then:
+            - switch.turn_off: heat_stage1_relay
+            - lambda: |-
+                ESP_LOGI("maintenance", "Manual control: Heat Stage 1 OFF");
+
+  # STAGE 2: Maintenance Heat Stage 2 Switch
+  - platform: template
+    name: "Maintenance Heat Stage 2"
+    id: maintenance_heat2
+    icon: "mdi:fire-circle"
+    web_server:
+      sorting_group_id: group_maintenance
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - if:
+          condition:
+            - switch.is_on: maintenance_mode
+          then:
+            # Safety: Turn off cooling before enabling heat
+            - if:
+                condition:
+                  - switch.is_on: cool_relay
+                then:
+                  - switch.turn_off: cool_relay
+                  - lambda: |-
+                      ESP_LOGW("maintenance", "Safety interlock: Cooling disabled before heat");
+            - switch.turn_on: heat_stage2_relay
+            - lambda: |-
+                ESP_LOGI("maintenance", "Manual control: Heat Stage 2 ON");
+    turn_off_action:
+      - if:
+          condition:
+            - switch.is_on: maintenance_mode
+          then:
+            - switch.turn_off: heat_stage2_relay
+            - lambda: |-
+                ESP_LOGI("maintenance", "Manual control: Heat Stage 2 OFF");
+
+  - platform: template
+    name: "Maintenance Cooling"
+    id: maintenance_cool
+    icon: "mdi:snowflake"
+    web_server:
+      sorting_group_id: group_maintenance
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - if:
+          condition:
+            - switch.is_on: maintenance_mode
+          then:
+            # Safety: Turn off all heating before enabling cooling
+            - if:
+                condition:
+                  lambda: |-
+                    return id(heat_stage1_relay).state ||
+                           id(heat_stage2_relay).state ||  // STAGE 2: Comment out this line if stage 2 disabled
+                           false;
+                then:
+                  - switch.turn_off: heat_stage1_relay
+                  - switch.turn_off: heat_stage2_relay  # STAGE 2: Comment out this line if stage 2 disabled
+                  - lambda: |-
+                      ESP_LOGW("maintenance", "Safety interlock: Heating disabled before cooling");
+            - switch.turn_on: cool_relay
+            - lambda: |-
+                ESP_LOGI("maintenance", "Manual control: Cooling ON");
+    turn_off_action:
+      - if:
+          condition:
+            - switch.is_on: maintenance_mode
+          then:
+            - switch.turn_off: cool_relay
+            - lambda: |-
+                ESP_LOGI("maintenance", "Manual control: Cooling OFF");
+
+  - platform: template
+    name: "Maintenance Fan"
+    id: maintenance_fan
+    icon: "mdi:fan"
+    web_server:
+      sorting_group_id: group_maintenance
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - if:
+          condition:
+            - switch.is_on: maintenance_mode
+          then:
+            - switch.turn_on: fan_relay
+            - lambda: |-
+                ESP_LOGI("maintenance", "Manual control: Fan ON");
+    turn_off_action:
+      - if:
+          condition:
+            - switch.is_on: maintenance_mode
+          then:
+            - switch.turn_off: fan_relay
+            - lambda: |-
+                ESP_LOGI("maintenance", "Manual control: Fan OFF");
+
+# Script to update humidifier state based on all conditions
+# conditions: HUM enabled, heating must be on, cooling must be off, validate setpoint/current readings, hysteresis check

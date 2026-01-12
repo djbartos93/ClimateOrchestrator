@@ -1,0 +1,180 @@
+number:
+  - platform: template
+    name: "Stage 2 Delay"
+    id: stage2_delay_minutes
+    optimistic: true
+    restore_value: true
+    min_value: 1
+    max_value: 15
+    initial_value: 5
+    step: 1
+    unit_of_measurement: "min"
+    icon: "mdi:timer-outline"
+    mode: box
+    web_server:
+      sorting_group_id: group_climate
+    on_value:
+      - lambda: |-
+          ESP_LOGI("config", "Stage 2 delay changed to %.0f minutes", x);
+
+# Set compressor off/lockout time
+  - platform: template
+    name: "Min Compressor Off Time"
+    id: min_compressor_off_minutes
+    optimistic: true
+    restore_value: true
+    min_value: 2
+    max_value: 10
+    initial_value: 3
+    step: 1
+    unit_of_measurement: "min"
+    icon: "mdi:timer-lock-outline"
+    web_server:
+      sorting_group_id: group_climate
+    mode: box
+    on_value:
+      - lambda: |-
+          ESP_LOGI("config", "Min compressor off time changed to %.0f minutes", x);
+
+# Set filter runtime hours before alerting
+  - platform: template
+    name: "Filter Runtime Threshold"
+    id: filter_change_threshold
+    optimistic: true
+    restore_value: true
+    min_value: 100
+    max_value: 500
+    initial_value: 180
+    step: 10
+    unit_of_measurement: "hours"
+    icon: "mdi:air-filter"
+    web_server:
+      sorting_group_id: group_runtimes
+    mode: box
+
+# COMPRESSOR minimum running time
+# TODO: note for future updates add a dedicated compressor control output
+  - platform: template
+    name: "Min Compressor Run Time (unused)"
+    id: min_compressor_run_minutes
+    optimistic: true
+    restore_value: true
+    min_value: 1
+    max_value: 10
+    initial_value: 5
+    step: 1
+    unit_of_measurement: "min"
+    icon: "mdi:timer-play-outline"
+    web_server:
+      sorting_group_id: group_climate
+    mode: box
+
+# setting the thermostat deadband (updates under/overshoot)
+  - platform: template
+    name: "Thermostat Deadband"
+    id: temp_deadband_slider
+    optimistic: true
+    restore_value: true
+    min_value: 0.1
+    max_value: 2.0
+    initial_value: 0.5
+    step: 0.1
+    unit_of_measurement: "°C"
+    web_server:
+      sorting_group_id: group_climate
+    mode: box
+    on_value:
+      then:
+        - lambda: |-
+            auto call = id(smart_thermostat).make_call();
+
+            // 1. Set ON thresholds (Hysteresis)
+            id(smart_thermostat).set_heat_deadband(x);
+            id(smart_thermostat).set_cool_deadband(x);
+
+            // 2. Set OFF thresholds (Overshoot)
+            // This tells the thermostat to stop as soon as it is 'x' degrees past setpoint
+            id(smart_thermostat).set_heat_overrun(x);
+            id(smart_thermostat).set_cool_overrun(x);
+
+            id(smart_thermostat).publish_state();
+            ESP_LOGI("config", "Hysteresis and Overshoot updated to: %.1f°C", x);
+
+# minimum heat runtime
+  - platform: template
+    name: "Min Heat Run Time"
+    id: min_heat_run_minutes
+    optimistic: true
+    restore_value: true
+    min_value: 1
+    max_value: 15
+    initial_value: 5
+    step: 1
+    unit_of_measurement: "min"
+    icon: "mdi:fire-timer"
+    web_server:
+      sorting_group_id: group_climate
+    mode: box
+    on_value:
+      - lambda: |-
+          ESP_LOGI("config", "Min heat run time changed to %.0f minutes", x);
+
+# minimum COOLING RUNTIME
+  - platform: template
+    name: "Min Cool Run Time"
+    id: min_cool_run_minutes
+    optimistic: true
+    restore_value: true
+    min_value: 1
+    max_value: 15
+    initial_value: 5
+    step: 1
+    unit_of_measurement: "min"
+    icon: "mdi:snowflake-timer"
+    web_server:
+      sorting_group_id: group_climate
+    mode: box
+    on_value:
+      - lambda: |-
+          ESP_LOGI("config", "Min cool run time changed to %.0f minutes", x);
+
+# Fan runtime extend heating
+  - platform: template
+    name: "Fan Post-Run Time (Heat)"
+    id: fan_post_run_heat_seconds
+    optimistic: true
+    restore_value: true
+    min_value: 0
+    max_value: 300
+    initial_value: 30
+    step: 5
+    unit_of_measurement: "s"
+    icon: "mdi:fan-clock"
+    web_server:
+      sorting_group_id: group_climate
+    mode: box
+    on_value:
+      - lambda: |-
+          ESP_LOGI("config", "Fan post-run time (heat) changed to %.0f seconds", x);
+
+# Fan runtime extend cooling
+  - platform: template
+    name: "Fan Post-Run Time (Cool)"
+    id: fan_post_run_cool_seconds
+    optimistic: true
+    restore_value: true
+    min_value: 0
+    max_value: 300
+    initial_value: 30
+    step: 5
+    unit_of_measurement: "s"
+    icon: "mdi:fan-clock"
+    web_server:
+      sorting_group_id: group_climate
+    mode: box
+    on_value:
+      - lambda: |-
+          ESP_LOGI("config", "Fan post-run time (cool) changed to %.0f seconds", x);
+
+
+# Buttons

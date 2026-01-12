@@ -1,0 +1,197 @@
+interval:
+  # Safety checks every 60 seconds
+  # checks include: heat/cool interlock, no HUM while cooling, no HUM without fan AND heat, remote sensor health, long runtime
+  - interval: 60s
+    then:
+      - lambda: |-
+          // CRITICAL SAFETY: Never heat and cool simultaneously
+          if (id(heat_stage1_relay).state && id(cool_relay).state) {
+            ESP_LOGE("safety", "CRITICAL: Heat and Cool both active! Emergency shutdown!");
+            id(heat_stage1_relay).turn_off();
+            id(heat_stage2_relay).turn_off();  // STAGE 2: Comment out if stage 2 disabled
+            id(cool_relay).turn_off();
+          }
+
+          // CRITICAL SAFETY: Never run humidifier while cooling
+          if (id(cool_relay).state && id(humidifier_relay).state) {
+            ESP_LOGE("safety", "CRITICAL: Humidifier running during cooling! Shutting down humidifier!");
+            id(humidifier_relay).turn_off();
+          }
+
+          // CRITICAL SAFETY: Never run humidifier without heat AND fan
+          if (id(humidifier_relay).state) {
+            bool heating = id(heat_stage1_relay).state || id(heat_stage2_relay).state;  // STAGE 2: Remove "|| id(heat_stage2_relay).state" if stage 2 disabled
+            bool fan = id(fan_relay).state;
+            if (!heating || !fan) {
+              ESP_LOGE("safety", "CRITICAL: Humidifier running without heat+fan! Shutting down!");
+              id(humidifier_relay).turn_off();
+            }
+          }
+
+          // Check sensor health
+          if (isnan(id(local_temperature).state)) {
+            ESP_LOGW("sensor", "Local temperature sensor reading NaN - possible failure");
+          }
+
+          // Check for excessive runtime
+          unsigned long max_runtime_ms = ${max_heat_runtime} * 1000;
+
+          if (id(heat_stage1_relay).state && id(heat_stage1_start_time) > 0) {
+            unsigned long runtime = millis() - id(heat_stage1_start_time);
+            if (runtime > max_runtime_ms) {
+              ESP_LOGW("runtime", "Heat has been running for %.1f hours - check system", runtime / 3600000.0);
+            }
+          }
+
+          if (id(cool_relay).state && id(cool_start_time) > 0) {
+            unsigned long runtime = millis() - id(cool_start_time);
+            if (runtime > max_runtime_ms) {
+              ESP_LOGW("runtime", "Cooling has been running for %.1f hours - check system", runtime / 3600000.0);
+            }
+          }
+
+          // Track filter runtime
+          if (id(fan_relay).state) {
+            id(filter_runtime_minutes) += 1;
+          }
+
+  # Update runtime statistics every minute
+  - interval: 60s
+    then:
+      - lambda: |-
+          if (id(heat_stage1_relay).state) {
+            id(heat_stage1_runtime_today) += 1;
+          }
+          // STAGE 2: Comment out this block (3 lines) if stage 2 disabled
+          if (id(heat_stage2_relay).state) {
+            id(heat_stage2_runtime_today) += 1;
+          }
+          if (id(cool_relay).state) {
+            id(cooling_runtime_today) += 1;
+          }
+
+  # Update humidifier state every 30 seconds
+  - interval: 30s
+    then:
+      - script.execute: update_humidifier_state
+
+  # Poll ecobee inputs when passthrough mode is active
+  - interval: 1s
+    then:
+      - lambda: |-
+          if (id(passthrough_mode_active)) {
+            id(update_passthrough_relays).execute();
+          }
+
+  # Check maintenance mode auto-disable (every 60 seconds)
+  - interval: 60s
+    then:
+      - lambda: |-
+          // Auto-disable maintenance mode after 30 minutes (unless keep_enabled is on)
+          if (id(maintenance_mode).state && !id(maintenance_mode_keep_enabled).state) {
+            if (id(maintenance_mode_start_time) > 0) {
+              unsigned long runtime = millis() - id(maintenance_mode_start_time);
+              unsigned long max_time = 30 * 60 * 1000;  // 30 minutes in milliseconds
+
+              if (runtime > max_time) {
+                ESP_LOGW("maintenance", "Maintenance mode auto-disabled after 30 minutes");
+                id(maintenance_mode).turn_off();
+                // Turn off all manual control switches
+                id(maintenance_heat1).turn_off();
+                id(maintenance_heat2).turn_off();
+                id(maintenance_cool).turn_off();
+                id(maintenance_fan).turn_off();
+              }
+            }
+          }
+# HIGH SPEED SAFETY CHECK (Every 1 second)
+  - interval: 1s
+    then:
+      - lambda: |-
+          if (id(maintenance_mode).state) return; // Skip in maintenance mode
+
+          bool heat_on = id(heat_stage1_relay).state || id(heat_stage2_relay).state;  // STAGE 2: Remove "|| id(heat_stage2_relay).state" if stage 2 disabled
+          bool cool_on = id(cool_relay).state;
+
+          if (heat_on && cool_on) {
+            ESP_LOGE("safety", "CRITICAL CONFLICT: Heat and Cool both active! FORCING SHUTDOWN!");
+            id(heat_stage1_relay).turn_off();
+            id(heat_stage2_relay).turn_off();  // STAGE 2: Comment out this line if stage 2 disabled
+            id(cool_relay).turn_off();
+            id(smart_thermostat).make_call().set_mode("OFF").perform();
+          }
+  - interval: 2s
+    then:
+      - script.execute: update_status_led
+
+  #more LED stuff
+  - interval: 50ms
+    then:
+      - lambda: |-
+          bool hvac_running = id(heat_stage1_relay).state || id(heat_stage2_relay).state ||  // STAGE 2: Remove "id(heat_stage2_relay).state ||" if stage 2 disabled
+                             id(cool_relay).state || id(fan_relay).state;
+
+          bool api_ok = id(api_connected_sensor).state;
+
+          // Determine if we are currently using the Local sensor (Fallback)
+          float local_temp = id(local_temperature).state;
+          float remote_temp = id(remote_temperature_override).state;
+          float ecobee_temp = id(ecobee_temperature_sensor).state;
+          unsigned long age = (millis() - id(last_remote_temp_update)) / 1000;
+
+          bool ecobee_usable = id(use_ecobee_temp).state && !isnan(ecobee_temp) && ecobee_temp > 5.0 && ecobee_temp < 35.0;
+          bool remote_usable = !isnan(remote_temp) && age < ${remote_temp_timeout} && (isnan(local_temp) || abs(remote_temp - local_temp) <= 10.0);
+          bool local_in_use = !ecobee_usable && !remote_usable;
+
+          if (!hvac_running) {
+            auto call = id(status_rgb).make_call();
+            float bri = 0.0f;
+
+            // API Alarm Acknowledged - Breathe orange
+            if (id(alarm_acknowledged)) {
+              call.set_rgb(1.0, 0.5, 0.0); // Orange
+              float val = (sinf(millis() * 0.002f) + 1.0f) / 2.0f;
+              bri = 0.1f + (val * 0.7f);
+            }
+            else if (api_ok) {
+              // NORMAL: Breathe current sensor color
+              float val = (sinf(millis() * 0.002f) + 1.0f) / 2.0f;
+              bri = 0.1f + (val * 0.7f);
+            } else {
+              // API DISCONNECTED: Flash Logic
+              bri = ((millis() / 100) % 2 == 0) ? 1.0f : 0.0f;
+
+              // EMERGENCY STATE: API Down + Local Sensor Fallback
+              if (local_in_use) {
+                call.set_rgb(1.0, 0.0, 0.0); // Force RED for fallback visibility
+              }
+            }
+
+            call.set_brightness(bri);
+            call.set_transition_length(0);
+            call.set_publish(false);
+            call.perform();
+          }
+  #trigger API buzzer alarm
+  - interval: 60s
+    then:
+      - lambda: |-
+          bool api_ok = id(api_connected_sensor).state;
+
+          if (api_ok) {
+            id(api_disconnect_time) = 0;
+            id(alarm_acknowledged) = false; // Reset acknowledgment when connection returns
+          } else {
+            // First time we notice a disconnect
+            if (id(api_disconnect_time) == 0) {
+              id(api_disconnect_time) = millis();
+            }
+
+            unsigned long down_time = (millis() - id(api_disconnect_time)) / 1000;
+
+            // Only alarm if down for > 5 mins, not muted, and not already acknowledged
+            if (down_time > 60 && !id(mute_api_alarm).state && !id(alarm_acknowledged)) {
+              ESP_LOGW("safety", "API disconnected for %lu seconds! Sounding alarm.", down_time);
+              id(my_buzzer).play("warning:d=8,o=5,b=100:c6,p,c6,p,c6"); 
+            }
+          }

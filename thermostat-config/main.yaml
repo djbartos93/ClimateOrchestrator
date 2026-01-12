@@ -1,0 +1,123 @@
+# ESPHome Smart Thermostat Configuration
+substitutions:
+
+#########################
+# MODIFICATIONS ALLOWED #
+#########################
+  device_name: smart-thermostat
+  friendly_name: "Smart Thermostat"
+
+  # Network Configuration
+  # To switch between WiFi and Ethernet, comment/uncomment the appropriate section around line 105
+
+  # WiFi Settings
+  wifi_ssid: !secret wifi_ssid
+  wifi_password: !secret wifi_password
+  wifi_fallback_ssid: !secret iot_wifi
+  wifi_fallback_password: !secret iot_password
+  wifi_domain: !secret esp_domain
+
+  # Logging Configuration
+  # Available levels: NONE, ERROR, WARN, INFO, DEBUG, VERBOSE
+  log_level_default: "INFO"
+  log_level_climate: "INFO"
+  log_level_dht: "INFO"
+  log_level_sensor: "INFO"
+  log_level_humidifier: "INFO"
+  log_level_light: "INFO"
+
+  # Syslog Configuration
+  # To enable syslog logging, uncomment the 'udp:' and 'syslog:' sections around line 137
+  # Set syslog_server to your syslog server IP address
+  syslog_server: "192.168.1.100"
+
+  # Home Assistant Sensor Entity IDs
+  # Update these to match your outdoor weather sensor entity IDs
+  outdoor_temp_entity: "sensor.lansing_st_weather_temp"
+  outdoor_humidity_entity: "sensor.lansing_st_weather_humidity"
+
+  # Remote Sensor Timeout (in seconds)
+  # After this time with no updates, system will failover to alternate temperature sensors
+  remote_temp_timeout: "300"
+  remote_humidity_timeout: "300"
+
+  # HVAC Feature Flags
+  # To DISABLE Stage 2 Heating:
+  #   Search for "# STAGE 2:" comments throughout this file
+  #   Comment out all lines marked with "# STAGE 2:" (8 sections total)
+  #   Sections: relay switch, maintenance switch, 2 safety interlocks, heat action,
+  #             idle action, fan_only action, emergency stop
+
+  # GPIO Pin Assignments - only change if you're using custom hardware
+  pin_dht22: GPIO0
+
+####################################
+# DO NOT MODIFY BELOW THIS COMMENT #
+####################################
+
+# Last build number / device
+  config_version: "0.3.6 - MBP Build"
+
+# Timing Constants (all in seconds)
+# sensable defaults are in place
+  heat_stage2_delay: "300"  
+  compressor_min_off: "180"  
+  compressor_min_runtime: "300"  
+  min_fan_runtime: "60"  
+  max_heat_runtime: "7200"  # 2 hours
+  max_cool_runtime: "7200"  # 2 hours
+
+# Temperature Settings
+  default_heat_setpoint: "21.0"  # 70°F
+  default_cool_setpoint: "24.0"  # 75°F
+  temp_deadband: "0.5"  # Temperature deadband in °C
+
+
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          ESP_LOGI("boot", "Smart Thermostat booting...");
+          id(last_remote_temp_update) = millis();
+          id(last_remote_humidity_update) = millis();
+          ESP_LOGI("boot", "Runtime counters restored from flash");
+      - rtttl.play: "boot:d=16,o=5,b=160:c,e,g" # Quick ascending chirp
+      - lambda: |-
+          ESP_LOGI("boot", "Hardware initialized - entering 60s boot lockout");
+      - delay: 60s
+      - lambda: |-
+          if (id(boot_lockout)) {
+            id(boot_lockout) = false;
+            ESP_LOGW("safety", "Boot lockout released via timeout (API still offline)");
+          }
+#Hardware setup, only change if using different/custom hardware
+esp32:
+  variant: esp32s3
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+psram:
+  mode: octal
+  speed: 80MHz
+
+# Package includes
+packages:
+  network: !include packages/network/wifi.yaml
+  # Uncomment for ethernet instead of wifi:
+  # network: !include packages/network/ethernet.yaml
+  
+  hardware: !include packages/hardware.yaml
+  globals: !include packages/globals.yaml
+  sensors: !include packages/sensors.yaml
+  switches: !include packages/switches.yaml
+  numbers: !include packages/numbers.yaml
+  buttons: !include packages/buttons.yaml
+  climate: !include packages/climate.yaml
+  scripts: !include packages/scripts.yaml
+  intervals: !include packages/intervals.yaml
+  esphome-core: !include packages/esphome-core.yaml
+

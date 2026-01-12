@@ -1,0 +1,163 @@
+script:
+  - id: update_humidifier_state
+    mode: restart  # Restart if called while running
+    then:
+      - lambda: |-
+          // Only run if auto control is enabled
+          if (!id(humidifier_manual_control).state) {
+            // Check if humidifier is globally enabled
+            if (!id(humidifier_enable).state) {
+              if (id(humidifier_relay).state) {
+                ESP_LOGI("humidifier", "Turning OFF - system disabled");
+                id(humidifier_relay).turn_off();
+              }
+              return;
+            }
+
+            // Check if it's safe to run humidifier
+            bool heating_running = id(heat_stage1_relay).state || id(heat_stage2_relay).state;  // STAGE 2: Remove "|| id(heat_stage2_relay).state" if stage 2 disabled
+            bool fan_running = id(fan_relay).state;
+            bool not_cooling = !id(cool_relay).state;
+            bool climate_heating = id(smart_thermostat).mode == CLIMATE_MODE_HEAT;
+
+            bool safe_to_run = heating_running && fan_running && not_cooling && climate_heating;
+
+            if (!safe_to_run) {
+              if (id(humidifier_relay).state) {
+                ESP_LOGI("humidifier", "Turning OFF - not safe to run (heating: %d, fan: %d, not_cooling: %d, mode: heat %d)",
+                         heating_running, fan_running, not_cooling, climate_heating);
+                id(humidifier_relay).turn_off();
+              }
+              return;
+            }
+
+            // Get current humidity and setpoint
+            float current_humidity = id(effective_humidity).state;
+            float setpoint = id(humidifier_setpoint_override).state;
+
+            // Validate readings
+            if (isnan(current_humidity) || isnan(setpoint)) {
+              ESP_LOGW("humidifier", "Invalid humidity or setpoint, turning OFF");
+              if (id(humidifier_relay).state) {
+                id(humidifier_relay).turn_off();
+              }
+              return;
+            }
+
+            // Hysteresis: turn on if below setpoint - 3%, turn off if above setpoint
+            bool should_be_on = current_humidity < (setpoint - 3.0);
+            bool should_be_off = current_humidity > setpoint;
+
+            if (should_be_on && !id(humidifier_relay).state) {
+              ESP_LOGI("humidifier", "Turning ON - Humidity %.0f%% < Setpoint %.0f%% - 3%%",
+                       current_humidity, setpoint);
+              id(humidifier_relay).turn_on();
+            } else if (should_be_off && id(humidifier_relay).state) {
+              ESP_LOGI("humidifier", "Turning OFF - Humidity %.0f%% > Setpoint %.0f%%",
+                       current_humidity, setpoint);
+              id(humidifier_relay).turn_off();
+            }
+          }
+
+  # Script to mirror ecobee relay outputs to our relays
+  # Used for passthrough mode
+  - id: update_passthrough_relays
+    mode: restart
+    then:
+      - lambda: |-
+          if (id(passthrough_mode_active)) {
+            // Mirror ecobee outputs to our relays
+            bool ecobee_w1 = id(ecobee_w1_input).state;
+            bool ecobee_w2 = id(ecobee_w2_input).state;
+            bool ecobee_y1 = id(ecobee_y1_input).state;
+            bool ecobee_g = id(ecobee_g_input).state;
+
+            // Update heat stage 1
+            if (ecobee_w1 && !id(heat_stage1_relay).state) {
+              ESP_LOGI("passthrough", "Activating Heat Stage 1 (ecobee command)");
+              id(heat_stage1_relay).turn_on();
+            } else if (!ecobee_w1 && id(heat_stage1_relay).state) {
+              ESP_LOGI("passthrough", "Deactivating Heat Stage 1 (ecobee command)");
+              id(heat_stage1_relay).turn_off();
+            }
+
+            // STAGE 2: Update heat stage 2 - Comment out this entire block (8 lines) if stage 2 disabled
+            if (ecobee_w2 && !id(heat_stage2_relay).state) {
+              ESP_LOGI("passthrough", "Activating Heat Stage 2 (ecobee command)");
+              id(heat_stage2_relay).turn_on();
+            } else if (!ecobee_w2 && id(heat_stage2_relay).state) {
+              ESP_LOGI("passthrough", "Deactivating Heat Stage 2 (ecobee command)");
+              id(heat_stage2_relay).turn_off();
+            }
+
+            // Update cooling
+            if (ecobee_y1 && !id(cool_relay).state) {
+              ESP_LOGI("passthrough", "Activating Cooling (ecobee command)");
+              id(cool_relay).turn_on();
+            } else if (!ecobee_y1 && id(cool_relay).state) {
+              ESP_LOGI("passthrough", "Deactivating Cooling (ecobee command)");
+              id(cool_relay).turn_off();
+            }
+
+            // Update fan
+            if (ecobee_g && !id(fan_relay).state) {
+              ESP_LOGI("passthrough", "Activating Fan (ecobee command)");
+              id(fan_relay).turn_on();
+            } else if (!ecobee_g && id(fan_relay).state) {
+              ESP_LOGI("passthrough", "Deactivating Fan (ecobee command)");
+              id(fan_relay).turn_off();
+            }
+          }
+  
+
+  # This is your main director script
+  - id: update_status_led
+    mode: restart
+    then:
+      - lambda: |-
+          auto call = id(status_rgb).make_call();
+          call.set_state(true);
+          call.set_effect("none");
+
+          // API Alarm Acknowledged - Override with orange
+          if (id(alarm_acknowledged)) {
+            call.set_rgb(1.0, 0.5, 0.0); // Orange
+            call.perform();
+            return;
+          }
+
+          bool humidifier_running = id(humidifier_relay).state;
+
+          // STAGE 2: Comment out this entire block (4 lines) if stage 2 disabled
+          if (id(heat_stage2_relay).state) {
+            if (humidifier_running) call.set_effect("Heat + Humidifier Stage 2");
+            else call.set_rgb(1.0, 0.0, 0.0);
+          }
+          else if (id(heat_stage1_relay).state) {
+            if (humidifier_running) call.set_effect("Heat + Humidifier Stage 1");
+            else call.set_rgb(1.0, 0.5, 0.0); 
+          }
+          else if (id(cool_relay).state) { call.set_rgb(0.0, 0.0, 1.0); } 
+          else if (id(fan_relay).state) { call.set_rgb(0.0, 1.0, 0.0); }  
+          else {
+            // --- IDLE STATE SENSOR LOGIC ---
+            float local_temp = id(local_temperature).state;
+            float remote_temp = id(remote_temperature_override).state;
+            float ecobee_temp = id(ecobee_temperature_sensor).state;
+            unsigned long age = (millis() - id(last_remote_temp_update)) / 1000;
+            
+            bool ecobee_usable = id(use_ecobee_temp).state && !isnan(ecobee_temp) && ecobee_temp > 5.0 && ecobee_temp < 35.0;
+            bool remote_usable = !isnan(remote_temp) && age < ${remote_temp_timeout} && (isnan(local_temp) || abs(remote_temp - local_temp) <= 10.0);
+
+            if (ecobee_usable) {
+              call.set_rgb(0.56, 0.93, 0.56); // Light Green
+            }
+            else if (remote_usable) {
+              call.set_rgb(1.0, 1.0, 1.0);   // White
+            }
+            else {
+              call.set_rgb(1.0, 0.0, 1.0);   // Magenta (Fallback to Local)
+            }
+          }
+          call.perform();
+# Climate Component - Main Thermostat Control

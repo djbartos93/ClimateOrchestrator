@@ -1,0 +1,18 @@
+# WiFi Network Configuration
+wifi:
+  networks:
+  - ssid: ${wifi_ssid}
+    password: ${wifi_password}
+  - ssid: ${wifi_fallback_ssid}
+    password: ${wifi_fallback_password}
+  domain: ${wifi_domain}
+  ap:
+    ssid: "${friendly_name} Fallback"
+    password: "thermostat"
+  reboot_timeout: 0min
+  power_save_mode: none
+  on_connect:
+    then:
+      - rtttl.play: "wifi:d=8,o=6,b=200:g,g"
+      - lambda: |-
+          ESP_LOGI("network", "WiFi connection established");

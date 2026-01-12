@@ -1,0 +1,576 @@
+# Thermal Model Package for Smart Thermostat
+# Physics-based predictive control using learned house characteristics
+# Version: 2.0 - Preset-Specific Learning
+thermostat_thermal_model:
+  # =============================================================================
+  # LEARNED PARAMETERS - These adapt over time to match your house
+  # =============================================================================
+  input_number:
+    # Thermal Mass (tau) - How slowly your house temperature changes
+    # Higher = more thermal inertia (concrete, brick)
+    # Lower = quick temp changes (poorly insulated)
+    # Unit: minutes
+    # NOTE: Global parameter (not preset-specific)
+    thermostat_thermal_mass:
+      name: "House Thermal Mass (τ)"
+      min: 10
+      max: 120
+      step: 1
+      initial: 45
+      unit_of_measurement: "min"
+      icon: mdi:home-thermometer
+      mode: box
+
+    # =============================================================================
+    # PRESET-SPECIFIC PARAMETERS - Separate learning for each preset mode
+    # =============================================================================
+    # Each preset (Home, Away, Sleep, Boost) learns independently because
+    # different room sensor combinations heat at different rates.
+    # This allows instant adaptation when switching presets.
+
+    # ---------------------------------------------------------------------------
+    # HOME MODE - Normal daytime comfort settings
+    # ---------------------------------------------------------------------------
+    thermostat_heat_loss_coefficient_home:
+      name: "Heat Loss Coeff - Home"
+      min: 0.1
+      max: 2.0
+      step: 0.05
+      initial: 0.5
+      unit_of_measurement: "°C/hr/°C"
+      icon: mdi:home-export-outline
+      mode: box
+
+    thermostat_stage1_heating_rate_home:
+      name: "Stage 1 Rate - Home"
+      min: 0.5
+      max: 5.0
+      step: 0.1
+      initial: 1.5
+      unit_of_measurement: "°C/hr"
+      icon: mdi:fire
+      mode: box
+
+    thermostat_stage2_additional_rate_home:
+      name: "Stage 2 Add Rate - Home"
+      min: 0.5
+      max: 5.0
+      step: 0.1
+      initial: 1.8
+      unit_of_measurement: "°C/hr"
+      icon: mdi:fire-circle
+      mode: box
+
+    thermostat_model_confidence_home:
+      name: "Model Confidence - Home"
+      min: 0
+      max: 100
+      step: 1
+      initial: 20
+      unit_of_measurement: "%"
+      icon: mdi:brain
+      mode: box
+
+    # ---------------------------------------------------------------------------
+    # AWAY MODE - Energy-saving settings when house is empty
+    # ---------------------------------------------------------------------------
+    thermostat_heat_loss_coefficient_away:
+      name: "Heat Loss Coeff - Away"
+      min: 0.1
+      max: 2.0
+      step: 0.05
+      initial: 0.5
+      unit_of_measurement: "°C/hr/°C"
+      icon: mdi:home-export-outline
+      mode: box
+
+    thermostat_stage1_heating_rate_away:
+      name: "Stage 1 Rate - Away"
+      min: 0.5
+      max: 5.0
+      step: 0.1
+      initial: 1.5
+      unit_of_measurement: "°C/hr"
+      icon: mdi:fire
+      mode: box
+
+    thermostat_stage2_additional_rate_away:
+      name: "Stage 2 Add Rate - Away"
+      min: 0.5
+      max: 5.0
+      step: 0.1
+      initial: 1.8
+      unit_of_measurement: "°C/hr"
+      icon: mdi:fire-circle
+      mode: box
+
+    thermostat_model_confidence_away:
+      name: "Model Confidence - Away"
+      min: 0
+      max: 100
+      step: 1
+      initial: 20
+      unit_of_measurement: "%"
+      icon: mdi:brain
+      mode: box
+
+    # ---------------------------------------------------------------------------
+    # SLEEP MODE - Nighttime comfort settings (often bedroom only)
+    # ---------------------------------------------------------------------------
+    thermostat_heat_loss_coefficient_sleep:
+      name: "Heat Loss Coeff - Sleep"
+      min: 0.1
+      max: 2.0
+      step: 0.05
+      initial: 0.5
+      unit_of_measurement: "°C/hr/°C"
+      icon: mdi:home-export-outline
+      mode: box
+
+    thermostat_stage1_heating_rate_sleep:
+      name: "Stage 1 Rate - Sleep"
+      min: 0.5
+      max: 5.0
+      step: 0.1
+      initial: 1.5
+      unit_of_measurement: "°C/hr"
+      icon: mdi:fire
+      mode: box
+
+    thermostat_stage2_additional_rate_sleep:
+      name: "Stage 2 Add Rate - Sleep"
+      min: 0.5
+      max: 5.0
+      step: 0.1
+      initial: 1.8
+      unit_of_measurement: "°C/hr"
+      icon: mdi:fire-circle
+      mode: box
+
+    thermostat_model_confidence_sleep:
+      name: "Model Confidence - Sleep"
+      min: 0
+      max: 100
+      step: 1
+      initial: 20
+      unit_of_measurement: "%"
+      icon: mdi:brain
+      mode: box
+
+    # ---------------------------------------------------------------------------
+    # BOOST MODE - Quick temperature recovery (all sensors)
+    # ---------------------------------------------------------------------------
+    thermostat_heat_loss_coefficient_boost:
+      name: "Heat Loss Coeff - Boost"
+      min: 0.1
+      max: 2.0
+      step: 0.05
+      initial: 0.5
+      unit_of_measurement: "°C/hr/°C"
+      icon: mdi:home-export-outline
+      mode: box
+
+    thermostat_stage1_heating_rate_boost:
+      name: "Stage 1 Rate - Boost"
+      min: 0.5
+      max: 5.0
+      step: 0.1
+      initial: 1.5
+      unit_of_measurement: "°C/hr"
+      icon: mdi:fire
+      mode: box
+
+    thermostat_stage2_additional_rate_boost:
+      name: "Stage 2 Add Rate - Boost"
+      min: 0.5
+      max: 5.0
+      step: 0.1
+      initial: 1.8
+      unit_of_measurement: "°C/hr"
+      icon: mdi:fire-circle
+      mode: box
+
+    thermostat_model_confidence_boost:
+      name: "Model Confidence - Boost"
+      min: 0
+      max: 100
+      step: 1
+      initial: 20
+      unit_of_measurement: "%"
+      icon: mdi:brain
+      mode: box
+
+    # Target cycle time (optimal for efficiency and equipment life)
+    # This will be auto-calculated based on house size, but user can override
+    thermostat_target_cycle_time:
+      name: "Target Cycle Time"
+      min: 15
+      max: 45
+      step: 1
+      initial: 25
+      unit_of_measurement: "min"
+      icon: mdi:timer-outline
+      mode: slider
+
+    # House characteristics for better recommendations
+    thermostat_house_square_feet:
+      name: "House Size (Square Feet)"
+      min: 500
+      max: 5000
+      step: 50
+      initial: 2000
+      unit_of_measurement: "sqft"
+      icon: mdi:home
+      mode: box
+
+    thermostat_house_year_built:
+      name: "House Year Built"
+      min: 1800
+      max: 2025
+      step: 5
+      initial: 1980
+      unit_of_measurement: "year"
+      icon: mdi:calendar
+      mode: box
+
+  # =============================================================================
+  # TEMPLATE SENSORS - Calculations and Predictions
+  # =============================================================================
+  template:
+    - sensor:
+        # -----------------------------------------------------------------------
+        # Recommended Target Cycle Time - Based on house characteristics
+        # -----------------------------------------------------------------------
+        - name: "Recommended Target Cycle Time"
+          unique_id: "a9b8c4d0-7e1b-8a8f-3c9e-6d4f7a6b9c0g"
+          unit_of_measurement: "min"
+          icon: "mdi:timer-star"
+          state: >
+            {% set sqft = states('input_number.thermostat_house_square_feet') | int(2000) %}
+            {% set year = states('input_number.thermostat_house_year_built') | int(1980) %}
+
+            {# Base cycle time on house size #}
+            {# Smaller houses: shorter cycles (less thermal mass) #}
+            {# Larger houses: longer cycles (more thermal mass) #}
+            {% if sqft < 1000 %}
+              {% set size_factor = 18 %}
+            {% elif sqft < 1500 %}
+              {% set size_factor = 22 %}
+            {% elif sqft < 2500 %}
+              {% set size_factor = 25 %}
+            {% elif sqft < 3500 %}
+              {% set size_factor = 28 %}
+            {% else %}
+              {% set size_factor = 32 %}
+            {% endif %}
+
+            {# Adjust for construction era #}
+            {# Older homes: shorter cycles (less insulation, leakier) #}
+            {# Newer homes: longer cycles (better insulation) #}
+            {% if year < 1950 %}
+              {% set age_adjust = -2 %}
+            {% elif year < 1980 %}
+              {% set age_adjust = -1 %}
+            {% elif year < 2000 %}
+              {% set age_adjust = 0 %}
+            {% else %}
+              {% set age_adjust = 1 %}
+            {% endif %}
+
+            {{ (size_factor + age_adjust) | round(0) }}
+
+        # -----------------------------------------------------------------------
+        # Active Sensor Configuration - Track which sensors are being averaged
+        # -----------------------------------------------------------------------
+        - name: "Active Temperature Sensor Config"
+          unique_id: "02191af2-df7c-4b72-b076-54a4b1ba20e8"
+          icon: "mdi:format-list-checks"
+          state: >
+            {% set active = [] %}
+            {% if is_state('input_boolean.thermostat_use_living_room_temp', 'on') %}
+              {% set active = active + ['LR'] %}
+            {% endif %}
+            {% if is_state('input_boolean.thermostat_use_bedroom_temp', 'on') %}
+              {% set active = active + ['BR'] %}
+            {% endif %}
+            {% if is_state('input_boolean.thermostat_use_kitchen_temp', 'on') %}
+              {% set active = active + ['KI'] %}
+            {% endif %}
+            {% if is_state('input_boolean.thermostat_use_office_temp', 'on') %}
+              {% set active = active + ['OF'] %}
+            {% endif %}
+            {{ active | join(',') if active | length > 0 else 'None' }}
+
+        # -----------------------------------------------------------------------
+        # Active Preset Mode - Which preset is currently active
+        # -----------------------------------------------------------------------
+        - name: "Active Preset Mode"
+          unique_id: "p1r2e3s4-5e6t-7m8o-9d0e-1a2b3c4d5e6f"
+          icon: "mdi:state-machine"
+          state: >
+            {% set preset = state_attr('climate.smart_thermostat', 'preset_mode') | lower %}
+            {% if preset in ['home', 'away', 'sleep', 'boost'] %}
+              {{ preset }}
+            {% else %}
+              home
+            {% endif %}
+
+        # -----------------------------------------------------------------------
+        # Current Heat Loss Rate - How fast house is losing heat right now
+        # Uses preset-specific heat loss coefficient
+        # -----------------------------------------------------------------------
+        - name: "Current Heat Loss Rate"
+          unique_id: "y7z6a2b8-5c9z-6y6d-1a7c-4b2d5y6z7a8b"
+          unit_of_measurement: "°C/hr"
+          state_class: measurement
+          icon: "mdi:arrow-collapse-down"
+          state: >
+            {% set indoor = states('sensor.thermostat_average_temperature') | float(21) %}
+            {% set outdoor = states('sensor.smart_thermostat_outdoor_temperature') | float(0) %}
+            {% set preset = states('sensor.active_preset_mode') | lower %}
+            {% set k = states('input_number.thermostat_heat_loss_coefficient_' + preset) | float(0.5) %}
+            {% set temp_diff = indoor - outdoor %}
+            {{ (k * temp_diff) | round(2) }}
+          availability: >
+            {{ states('sensor.thermostat_average_temperature') not in ['unknown', 'unavailable'] and
+              states('sensor.smart_thermostat_outdoor_temperature') not in ['unknown', 'unavailable'] }}
+
+        # -----------------------------------------------------------------------
+        # Predicted Time to Setpoint (Stage 1 Only)
+        # Uses preset-specific stage 1 heating rate
+        # -----------------------------------------------------------------------
+        - name: "Predicted Time to Setpoint (Stage 1)"
+          unique_id: "z8a7b3c9-6d0a-7z7e-2b8d-5c3e6z7a8b9c"
+          unit_of_measurement: "min"
+          icon: "mdi:clock-fast"
+          state: >
+            {% set current_temp = states('sensor.thermostat_average_temperature') | float(21) %}
+            {% set setpoint = state_attr('climate.smart_thermostat', 'temperature') | float(21) %}
+            {% set temp_needed = setpoint - current_temp %}
+
+            {% if temp_needed <= 0 %}
+              0
+            {% else %}
+              {% set preset = states('sensor.active_preset_mode') | lower %}
+              {% set heat_loss = states('sensor.current_heat_loss_rate') | float(0) %}
+              {% set stage1_rate = states('input_number.thermostat_stage1_heating_rate_' + preset) | float(1.5) %}
+              {% set net_heating_rate = stage1_rate - heat_loss %}
+
+              {% if net_heating_rate <= 0 %}
+                999
+              {% else %}
+                {{ ((temp_needed / net_heating_rate) * 60) | round(0) }}
+              {% endif %}
+            {% endif %}
+
+        # -----------------------------------------------------------------------
+        # Predicted Time to Setpoint (Stage 1 + Stage 2)
+        # Uses preset-specific stage 1 + stage 2 heating rates
+        # -----------------------------------------------------------------------
+        - name: "Predicted Time to Setpoint (Stage 1+2)"
+          unique_id: "a9b8c4d0-7e1b-8a8f-3c9e-6d4f7a8b9c0d"
+          unit_of_measurement: "min"
+          icon: "mdi:clock-fast"
+          state: >
+            {% set current_temp = states('sensor.thermostat_average_temperature') | float(21) %}
+            {% set setpoint = state_attr('climate.smart_thermostat', 'temperature') | float(21) %}
+            {% set temp_needed = setpoint - current_temp %}
+
+            {% if temp_needed <= 0 %}
+              0
+            {% else %}
+              {% set preset = states('sensor.active_preset_mode') | lower %}
+              {% set heat_loss = states('sensor.current_heat_loss_rate') | float(0) %}
+              {% set stage1_rate = states('input_number.thermostat_stage1_heating_rate_' + preset) | float(1.5) %}
+              {% set stage2_add = states('input_number.thermostat_stage2_additional_rate_' + preset) | float(1.8) %}
+              {% set total_rate = stage1_rate + stage2_add %}
+              {% set net_heating_rate = total_rate - heat_loss %}
+
+              {% if net_heating_rate <= 0 %}
+                999
+              {% else %}
+                {{ ((temp_needed / net_heating_rate) * 60) | round(0) }}
+              {% endif %}
+            {% endif %}
+
+        # -----------------------------------------------------------------------
+        # Optimal Stage 2 Delay - Calculated to hit target cycle time
+        # Uses preset-specific heating rates for calculation
+        # -----------------------------------------------------------------------
+        - name: "Optimal Stage 2 Delay"
+          unique_id: "1ef45e48-4162-49f3-ba74-22f6681785d9"
+          unit_of_measurement: "min"
+          icon: "mdi:timer-cog"
+          state: >
+            {% set target_cycle = states('input_number.thermostat_target_cycle_time') | float(25) %}
+            {% set predicted_stage1_only = states('sensor.predicted_time_to_setpoint_stage_1') | float(30) %}
+            {% set predicted_both_stages = states('sensor.predicted_time_to_setpoint_stage_1_2') | float(15) %}
+
+            {# If stage 1 alone can hit target, use long delay (stage 2 not needed) #}
+            {% if predicted_stage1_only <= target_cycle %}
+              {% set optimal = 15 %}
+            {# If both stages can't hit target fast enough, use minimum delay #}
+            {% elif predicted_both_stages >= target_cycle %}
+              {% set optimal = 2 %}
+            {# Calculate delay to hit target cycle time #}
+            {% else %}
+              {# Time on stage 1 alone + time on both stages = target #}
+              {# delay + (target - delay) * rate_ratio = target #}
+              {% set preset = states('sensor.active_preset_mode') | lower %}
+              {% set stage1_rate = states('input_number.thermostat_stage1_heating_rate_' + preset) | float(1.5) %}
+              {% set stage2_add = states('input_number.thermostat_stage2_additional_rate_' + preset) | float(1.8) %}
+              {% set heat_loss = states('sensor.current_heat_loss_rate') | float(0) %}
+              {% set net_stage1 = stage1_rate - heat_loss %}
+              {% set net_both = stage1_rate + stage2_add - heat_loss %}
+
+              {% if net_both <= net_stage1 %}
+                {% set optimal = 5 %}
+              {% else %}
+                {# Use weighted average based on how much help stage 2 provides #}
+                {% set stage2_improvement = net_both / net_stage1 %}
+                {% set time_savings = predicted_stage1_only - predicted_both_stages %}
+                {% set optimal = target_cycle - predicted_both_stages %}
+                {% set optimal = [optimal, 2] | max %}
+                {% set optimal = [optimal, 12] | min %}
+              {% endif %}
+            {% endif %}
+
+            {{ optimal | round(0) }}
+
+        # -----------------------------------------------------------------------
+        # Heating Efficiency Score (0-100)
+        # Higher = more efficient (less stage 2, good cycle times)
+        # -----------------------------------------------------------------------
+        - name: "Heating Efficiency Score"
+          unique_id: "c1d0e6f2-9g3d-0c0h-5e1g-8f6h9c0d1e2f"
+          unit_of_measurement: "%"
+          icon: "mdi:gauge"
+          state: >
+            {% set stage1_runtime = states('sensor.smart_thermostat_heat_stage_1_runtime_today') | int(0) %}
+            {% set stage2_runtime = states('sensor.smart_thermostat_heat_stage_2_runtime_today') | int(0) %}
+            {% set total_runtime = stage1_runtime + stage2_runtime %}
+
+            {% if total_runtime == 0 %}
+              100
+            {% else %}
+              {% set stage2_pct = (stage2_runtime / total_runtime * 100) | round(1) %}
+              {% set cycles = states('counter.thermostat_heating_cycles_today') | int(0) %}
+
+              {# Optimal stage 2 usage: 20-30% #}
+              {% if stage2_pct >= 20 and stage2_pct <= 30 %}
+                {% set stage2_score = 100 %}
+              {% elif stage2_pct < 20 %}
+                {% set stage2_score = 100 - ((20 - stage2_pct) * 2) %}
+              {% else %}
+                {% set stage2_score = 100 - ((stage2_pct - 30) * 3) %}
+              {% endif %}
+
+              {# Optimal cycles: 4-8 per day #}
+              {% if cycles >= 4 and cycles <= 8 %}
+                {% set cycle_score = 100 %}
+              {% elif cycles < 4 %}
+                {% set cycle_score = 80 + (cycles * 5) %}
+              {% else %}
+                {% set cycle_score = 100 - ((cycles - 8) * 10) %}
+              {% endif %}
+
+              {# Weighted average: 60% stage2, 40% cycles #}
+              {{ ((stage2_score * 0.6 + cycle_score * 0.4) | round(0)) | int }}
+            {% endif %}
+
+        # -----------------------------------------------------------------------
+        # Model Status - Human readable (shows active preset's confidence)
+        # -----------------------------------------------------------------------
+        - name: "Thermal Model Status"
+          unique_id: "d2e1f7g3-0h4e-1d1i-6f2h-9g7i0d1e2f3g"
+          icon: "mdi:brain"
+          state: >
+            {% set preset = states('sensor.active_preset_mode') | lower %}
+            {% set confidence = states('input_number.thermostat_model_confidence_' + preset) | int(20) %}
+            {% set current_config = states('sensor.active_temperature_sensor_config') %}
+            {% set last_config = states('input_text.thermostat_last_sensor_config_' + preset) %}
+            {% set config_changed = current_config != last_config and last_config != '' %}
+
+            {% if config_changed %}
+              {{ preset | title }}: Config Changed ({{ confidence }}%)
+            {% elif confidence < 40 %}
+              {{ preset | title }}: Learning ({{ confidence }}%)
+            {% elif confidence < 70 %}
+              {{ preset | title }}: Calibrating ({{ confidence }}%)
+            {% elif confidence < 90 %}
+              {{ preset | title }}: Reliable ({{ confidence }}%)
+            {% else %}
+              {{ preset | title }}: Optimized ({{ confidence }}%)
+            {% endif %}
+
+    - binary_sensor:
+        # -----------------------------------------------------------------------
+        # Stage 2 Recommended - Should we use stage 2 based on model?
+        # -----------------------------------------------------------------------
+        - name: "Stage 2 Recommended"
+          unique_id: "e3f2g8h4-1i5f-2e2j-7g3i-0h8j1e2f3g4h"
+          device_class: heat
+          state: >
+            {% set predicted_stage1 = states('sensor.predicted_time_to_setpoint_stage_1') | int(30) %}
+            {% set target = states('input_number.thermostat_target_cycle_time') | int(25) %}
+            {{ predicted_stage1 > target }}
+
+        # -----------------------------------------------------------------------
+        # Sensor Configuration Changed - Needs recalibration for active preset
+        # -----------------------------------------------------------------------
+        - name: "Sensor Configuration Changed"
+          unique_id: "d2e1f7g3-0h4e-1d1i-6f2h-9g7i0d1e2f3h"
+          device_class: problem
+          state: >
+            {% set preset = states('sensor.active_preset_mode') | lower %}
+            {% set current_config = states('sensor.active_temperature_sensor_config') %}
+            {% set last_config = states('input_text.thermostat_last_sensor_config_' + preset) %}
+            {{ current_config != last_config and last_config != '' }}
+
+  # =============================================================================
+  # HELPER ENTITIES for Learning System
+  # =============================================================================
+  input_datetime:
+    # Last time model parameters were updated
+    thermostat_last_model_update:
+      name: "Last Model Update"
+      has_date: true
+      has_time: true
+
+  input_text:
+    # Store recent heating cycle data (JSON)
+    thermostat_recent_cycles:
+      name: "Recent Heating Cycles (JSON)"
+      max: 255
+      initial: "[]"
+
+    # Store sensor configuration when each preset was last updated
+    thermostat_last_sensor_config_home:
+      name: "Last Sensor Config - Home"
+      max: 255
+      initial: ""
+
+    thermostat_last_sensor_config_away:
+      name: "Last Sensor Config - Away"
+      max: 255
+      initial: ""
+
+    thermostat_last_sensor_config_sleep:
+      name: "Last Sensor Config - Sleep"
+      max: 255
+      initial: ""
+
+    thermostat_last_sensor_config_boost:
+      name: "Last Sensor Config - Boost"
+      max: 255
+      initial: ""
+
+  # =============================================================================
+  # COUNTERS for Learning System
+  # =============================================================================
+  counter:
+    # Number of heating cycles analyzed by model
+    thermostat_cycles_analyzed:
+      name: "Cycles Analyzed by Model"
+      icon: mdi:counter
+      restore: true

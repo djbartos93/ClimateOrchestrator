@@ -1,0 +1,96 @@
+# Global variables for state tracking
+globals:
+  - id: boot_lockout
+    type: bool
+    initial_value: 'true'
+    restore_value: no
+
+  - id: api_disconnect_time
+    type: unsigned long
+    initial_value: '0'
+
+  - id: alarm_acknowledged
+    type: bool
+    initial_value: 'false'
+
+  - id: led_bri
+    type: float
+    initial_value: '0.1'
+
+  - id: last_remote_temp_update
+    type: unsigned long
+    restore_value: no
+    initial_value: '0'
+
+  - id: last_remote_humidity_update
+    type: unsigned long
+    restore_value: no
+    initial_value: '0'
+
+  - id: heat_stage1_start_time
+    type: unsigned long
+    restore_value: no
+    initial_value: '0'
+
+  - id: heat_stage2_start_time
+    type: unsigned long
+    restore_value: no
+    initial_value: '0'
+
+  - id: cool_start_time
+    type: unsigned long
+    restore_value: no
+    initial_value: '0'
+
+  - id: last_compressor_stop_time
+    type: unsigned long
+    restore_value: no
+    initial_value: '0'
+
+  # Persistent tracking for reboot protection
+  - id: last_heat_off_time_persistent
+    type: unsigned long
+    restore_value: yes
+    initial_value: '0'
+
+  - id: last_cool_off_time_persistent
+    type: unsigned long
+    restore_value: yes
+    initial_value: '0'
+
+  - id: filter_runtime_minutes
+    type: int
+    restore_value: yes
+    initial_value: '0'
+
+  - id: heat_stage1_runtime_today
+    type: int
+    restore_value: yes  
+    initial_value: '0'
+
+  - id: heat_stage2_runtime_today
+    type: int
+    restore_value: yes 
+    initial_value: '0'
+
+  - id: cooling_runtime_today
+    type: int
+    restore_value: yes 
+    initial_value: '0'
+
+  - id: passthrough_mode_active
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+
+  - id: maintenance_mode_start_time
+    type: unsigned long
+    restore_value: no
+    initial_value: '0'
+
+  - id: last_hvac_mode
+    type: int
+    restore_value: no
+    initial_value: '0'  # 0=none, 1=heating, 2=cooling
+
+#configure the RGB Status LED

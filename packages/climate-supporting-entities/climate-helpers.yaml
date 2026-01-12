@@ -1,0 +1,111 @@
+thermostat_helpers:
+  input_number:
+    # Manual humidifier setpoint override
+    humidifier_manual_setpoint:
+      name: "Humidifier Manual Setpoint"
+      min: 25
+      max: 50
+      step: 1
+      unit_of_measurement: "%"
+      icon: mdi:water-percent
+      mode: slider
+
+  # =============================================================================
+  # INPUT BOOLEANS
+  # =============================================================================
+  input_boolean:
+    # Toggle between manual and auto humidifier setpoint
+    humidifier_manual_setpoint:
+      name: "Manual Humidifier Setpoint"
+      icon: mdi:hand-back-right
+
+    # Auto-enable ecobee passthrough during vacation
+    ecobee_passthrough_on_vacation:
+      name: "Auto Ecobee Passthrough on Vacation"
+      icon: mdi:home-export-outline
+      initial: true
+
+    # -------------------------------------------------------------------------
+    # Sensor Selection for Averaging
+    # -------------------------------------------------------------------------
+    # CUSTOMIZE: Update these based on your actual sensor names
+
+    # Temperature sensor toggles
+    thermostat_use_living_room_temp:
+      name: "Use Living Room Temperature"
+      icon: mdi:sofa
+      initial: true
+
+    thermostat_use_bedroom_temp:
+      name: "Use Bedroom Temperature"
+      icon: mdi:bed
+      initial: true
+
+    thermostat_use_kitchen_temp:
+      name: "Use Kitchen Temperature"
+      icon: mdi:fridge
+      initial: true
+
+    thermostat_use_office_temp:
+      name: "Use Office Temperature"
+      icon: mdi:desk
+      initial: true
+
+    thermostat_use_office_humidity:
+      name: "Use Office Humidity"
+      icon: mdi:desk
+      initial: true
+
+
+    # Humidity sensor toggles
+    thermostat_use_living_room_humidity:
+      name: "Use Living Room Humidity"
+      icon: mdi:sofa
+      initial: true
+
+    thermostat_use_bedroom_humidity:
+      name: "Use Bedroom Humidity"
+      icon: mdi:bed
+      initial: true
+
+    thermostat_use_kitchen_humidity:
+      name: "Use Kitchen Humidity"
+      icon: mdi:fridge
+      initial: true
+
+  # =============================================================================
+  # INPUT SELECT
+  # =============================================================================
+  input_select:
+    # House mode selector
+    # CUSTOMIZE: Adjust options based on your needs
+    house_mode:
+      name: "House Mode"
+      options:
+        - Home
+        - Away
+        - Vacation
+        - Night
+      icon: mdi:home-variant
+
+  # =============================================================================
+  # COUNTERS
+  # =============================================================================
+  counter:
+    # Daily heating cycle counter
+    thermostat_heating_cycles_today:
+      name: "Heating Cycles Today"
+      icon: mdi:fire
+      restore: false
+
+    # Daily cooling cycle counter
+    thermostat_cooling_cycles_today:
+      name: "Cooling Cycles Today"
+      icon: mdi:snowflake
+      restore: false
+
+    # Humidifier runtime counter (persistent)
+    humidifier_runtime_minutes:
+      name: "Humidifier Runtime (Minutes)"
+      icon: mdi:air-humidifier
+      restore: true
