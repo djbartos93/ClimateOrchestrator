@@ -95,13 +95,11 @@ thermal_model_learning:
           action: input_text.set_value
         - data:
             name: Thermal Model Learning
-            message:
-              "[{{ active_preset | title }}] Cycle analyzed: {{ cycle_duration }}min,
+            message: >
+              [{{ active_preset | title }}] Cycle analyzed: {{ cycle_duration }}min,
               {{ temp_rise | round(1) }}°C rise, {{ observed_heating_rate | round(1) }}°C/hr
               rate. Confidence: {{ states('input_number.thermostat_model_confidence_'
               + active_preset) | int }}%
-
-              "
           action: logbook.log
       mode: queued
       max: 5
@@ -194,23 +192,19 @@ thermal_model_learning:
         - service: notify.notify
           data:
             title: "\U0001F504 Thermal Model: Sensor Config Changed"
-            message:
-              "[{{ active_preset | title }}] You changed which room sensors are being averaged. Model confidence
+            message: >
+              [{{ active_preset | title }}] You changed which room sensors are being averaged. Model confidence
               reduced to {{ [((states('input_number.thermostat_model_confidence_' + active_preset) | int(20))
               * 0.8) | round(0), 20] | max }}% for recalibration. The model will adapt to
               the new configuration over the next few heating cycles.
 
               New config: {{ states('sensor.active_temperature_sensor_config') }}
-
-              "
         - service: logbook.log
           data:
             name: Thermal Model
-            message:
-              "[{{ active_preset | title }}] Sensor configuration changed to {{ states('sensor.active_temperature_sensor_config')
+            message: >
+              [{{ active_preset | title }}] Sensor configuration changed to {{ states('sensor.active_temperature_sensor_config')
               }}. Confidence reduced for recalibration.
-
-              "
     - id: thermal_model_auto_set_target_cycle_time
       alias: "Thermal Model: Auto-Set Target Cycle Time"
       description: Automatically set target cycle time based on house characteristics
@@ -233,12 +227,10 @@ thermal_model_learning:
         - service: logbook.log
           data:
             name: Thermal Model
-            message:
-              "Target cycle time set to {{ states('sensor.recommended_target_cycle_time')
-              }} minutes based on house characteristics ({{ states('input_number.thermostat_house_square_feet')
-              | int }} sqft, built {{ states('input_number.thermostat_house_year_built')
-              | int }})
-
+            message: >
+              Target cycle time set to {{ states('sensor.recommended_target_cycle_time') }}
+              minutes based on house characteristics ({{ states('input_number.thermostat_house_square_feet') | int }}
+              sqft, built {{ states('input_number.thermostat_house_year_built') | int }})
 
     - id: thermal_model_track_cycle_start
       alias: "Thermal Model: Track Cycle Start"
@@ -255,11 +247,9 @@ thermal_model_learning:
           action: input_text.set_value
         - data:
             name: Thermal Model Learning
-            message:
-              "Cycle started: {{ cycle_data.temp_delta | round(1) }}°C to go, outdoor
+            message: >
+              Cycle started: {{ cycle_data.temp_delta | round(1) }}°C to go, outdoor
               {{ cycle_data.outdoor_temp | round(1) }}°C
-
-              "
           action: logbook.log
       mode: restart
       variables:
