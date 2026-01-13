@@ -97,16 +97,16 @@
           sequence:
             - data:
                 temperature:
-                  "{{ states('sensor.thermostat_average_temperature') | float
+                  "{{ states('sensor.thermostat_average_temperature') | float(21)
                   }}"
               action: esphome.smart_thermostat_set_remote_temperature
             - data:
                 temperature:
-                  "{{ ((states('sensor.main_floor_temperature') | float - 32)
+                  "{{ ((states('sensor.main_floor_temperature') | float(72) - 32)
                   * 5 / 9) | round(1) }}"
               action: esphome.smart_thermostat_set_ecobee_temperature
             - data:
-                humidity: "{{ states('sensor.thermostat_average_humidity') | float }}"
+                humidity: "{{ states('sensor.thermostat_average_humidity') | float(40) }}"
               action: esphome.smart_thermostat_set_remote_humidity
         - conditions:
             - condition: trigger
@@ -121,7 +121,7 @@
               state: "on"
           sequence:
             - data:
-                humidity: "{{ states('sensor.thermostat_average_humidity') | float }}"
+                humidity: "{{ states('sensor.thermostat_average_humidity') | float(40) }}"
               action: esphome.smart_thermostat_set_remote_humidity
         - conditions:
             - condition: trigger
@@ -136,7 +136,7 @@
               state: "on"
           sequence:
             - data:
-                setpoint: "{{ states('sensor.humidifier_effective_setpoint') | float }}"
+                setpoint: "{{ states('sensor.humidifier_effective_setpoint') | float(35) }}"
               action: esphome.smart_thermostat_set_humidifier_setpoint
         - conditions:
             - condition: trigger
@@ -155,7 +155,7 @@
                 milliseconds: 1
             - data:
                 temperature:
-                  "{{ ((states('sensor.main_floor_temperature') | float - 32)
+                  "{{ ((states('sensor.main_floor_temperature') | float(72) - 32)
                   * 5 / 9) | round(1) }}"
               action: esphome.smart_thermostat_set_ecobee_temperature
         - conditions:
@@ -277,7 +277,7 @@
               data:
                 temperature:
                   "{{ state_attr('climate.smart_thermostat', 'temperature')
-                  | float + 1 }}"
+                  | float(21) + 1 }}"
               action: climate.set_temperature
             - data:
                 title: Thermostat Pre-heating
@@ -302,7 +302,7 @@
               data:
                 temperature:
                   "{{ state_attr('climate.smart_thermostat', 'temperature')
-                  | float + 1 }}"
+                  | float(24) + 1 }}"
               action: climate.set_temperature
             - data:
                 title: Heat Wave Adjustment

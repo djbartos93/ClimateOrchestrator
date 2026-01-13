@@ -11,8 +11,8 @@
   conditions:
     - condition: template
       value_template:
-        "{{ states('sensor.thermostat_average_temperature') | float >=\n
-        \  state_attr('climate.smart_thermostat', 'temperature') | float - 0.3 }}\n"
+        "{{ states('sensor.thermostat_average_temperature') | float(21) >=\n
+        \  state_attr('climate.smart_thermostat', 'temperature') | float(21) - 0.3 }}\n"
       enabled: false
   actions:
     - target:
@@ -39,10 +39,10 @@
           "
         current_stage1_rate:
           "{{ states('input_number.thermostat_stage1_heating_rate_'
-          + active_preset) | float }}"
+          + active_preset) | float(1.5) }}"
         current_loss_coeff:
           "{{ states('input_number.thermostat_heat_loss_coefficient_'
-          + active_preset) | float }}"
+          + active_preset) | float(0.5) }}"
     - choose:
         - conditions:
             - condition: template
@@ -52,8 +52,8 @@
                 entity_id: "{{ stage1_entity }}"
               data:
                 value:
-                  "{% set new_estimate = observed_heating_rate | float %} {% set current
-                  = current_stage1_rate | float %} {% set lr = learning_rate | float %}
+                  "{% set new_estimate = observed_heating_rate | float(1.5) %} {% set current
+                  = current_stage1_rate | float(1.5) %} {% set lr = learning_rate | float(0.3) %}
                   {% set updated = current * (1 - lr) + new_estimate * lr %} {{ [0.5, [updated,
                   5.0] | min] | max | round(2) }}
 
@@ -63,12 +63,12 @@
         entity_id: "{{ loss_coeff_entity }}"
       data:
         value:
-          "{% if temp_diff_avg | float > 5 %}\n  {# Calculate heat loss from observed
-          performance #}\n  {% set furnace_input = observed_heating_rate | float %}\n
+          "{% if temp_diff_avg | float(0) > 5 %}\n  {# Calculate heat loss from observed
+          performance #}\n  {% set furnace_input = observed_heating_rate | float(1.5) %}\n
           \ {% set net_heating = temp_rise / (cycle_duration / 60) %}\n  {% set estimated_loss
           = furnace_input - net_heating %}\n  {% set estimated_loss_coeff = estimated_loss
-          / temp_diff_avg %}\n\n  {% set current = current_loss_coeff | float %}\n  {%
-          set lr = learning_rate | float %}\n  {% set updated = current * (1 - lr) +
+          / temp_diff_avg %}\n\n  {% set current = current_loss_coeff | float(0.5) %}\n  {%
+          set lr = learning_rate | float(0.3) %}\n  {% set updated = current * (1 - lr) +
           estimated_loss_coeff * lr %}\n  {{ [0.1, [updated, 2.0] | min] | max | round(3)
           }}\n{% else %}\n  {{ current_loss_coeff }}\n{% endif %}\n"
       action: input_number.set_value
@@ -115,8 +115,8 @@
       "
     temp_rise:
       "{% set cycle_data = states('input_text.thermostat_recent_cycles')
-      | from_json %} {{ (states('sensor.thermostat_average_temperature') | float)
-      - cycle_data.start_temp }}
+      | from_json %} {{ (states('sensor.thermostat_average_temperature') | float(21))
+      - cycle_data.start_temp | float(21) }}
 
       "
     outdoor_temp:
@@ -138,11 +138,11 @@
       "
     indoor_temp_avg:
       "{% set cycle_data = states('input_text.thermostat_recent_cycles')
-      | from_json %} {{ (cycle_data.start_temp + states('sensor.thermostat_average_temperature')
-      | float) / 2 }}
+      | from_json %} {{ (cycle_data.start_temp | float(21) + states('sensor.thermostat_average_temperature')
+      | float(21)) / 2 }}
 
       "
-    temp_diff_avg: "{{ indoor_temp_avg | float - outdoor_temp | float }}
+    temp_diff_avg: "{{ indoor_temp_avg | float(21) - outdoor_temp | float(0) }}
 
       "
 - id: thermal_model_sensor_config_changed
@@ -157,10 +157,18 @@
         - input_boolean.thermostat_use_kitchen_temp
       for:
         seconds: 5
+  variables:
+    active_preset: >
+      {% set preset = state_attr('climate.smart_thermostat', 'preset_mode') | lower %}
+      {% if preset in ['home', 'away', 'sleep', 'boost'] %}
+        {{ preset }}
+      {% else %}
+        home
+      {% endif %}
   condition:
     - condition: template
       value_template:
-        "{{ states('input_text.thermostat_last_sensor_config') != ''
+        "{{ states('input_text.thermostat_last_sensor_config_' + active_preset) != ''
         }}"
     - condition: state
       entity_id: binary_sensor.sensor_configuration_changed
@@ -168,25 +176,25 @@
   action:
     - service: input_number.set_value
       target:
-        entity_id: input_number.thermostat_model_confidence
+        entity_id: "input_number.thermostat_model_confidence_{{ active_preset }}"
       data:
         value:
-          "{% set current = states('input_number.thermostat_model_confidence')
-          | int %} {% set reduced = (current * 0.8) | round(0) %} {{ [reduced, 20] |
+          "{% set current = states('input_number.thermostat_model_confidence_' + active_preset)
+          | int(20) %} {% set reduced = (current * 0.8) | round(0) %} {{ [reduced, 20] |
           max }}
 
           "
     - service: input_text.set_value
       target:
-        entity_id: input_text.thermostat_last_sensor_config
+        entity_id: "input_text.thermostat_last_sensor_config_{{ active_preset }}"
       data:
         value: "{{ states('sensor.active_temperature_sensor_config') }}"
     - service: notify.notify
       data:
         title: "\U0001F504 Thermal Model: Sensor Config Changed"
         message:
-          "You changed which room sensors are being averaged. Model confidence
-          reduced to {{ [((states('input_number.thermostat_model_confidence') | int)
+          "[{{ active_preset | title }}] You changed which room sensors are being averaged. Model confidence
+          reduced to {{ [((states('input_number.thermostat_model_confidence_' + active_preset) | int(20))
           * 0.8) | round(0), 20] | max }}% for recalibration. The model will adapt to
           the new configuration over the next few heating cycles.
 
@@ -197,7 +205,7 @@
       data:
         name: Thermal Model
         message:
-          "Sensor configuration changed to {{ states('sensor.active_temperature_sensor_config')
+          "[{{ active_preset | title }}] Sensor configuration changed to {{ states('sensor.active_temperature_sensor_config')
           }}. Confidence reduced for recalibration.
 
           "
@@ -255,17 +263,11 @@
   variables:
     cycle_data:
       start_time: "{{ now().isoformat() }}"
-      start_temp: "{{ states('sensor.thermostat_average_temperature') | float }}"
-      outdoor_temp: "{{ states('sensor.smart_thermostat_outdoor_temperature') |
-        float }}"
-      setpoint:
-        "{{ state_attr('climate.smart_thermostat', 'temperature') | float
-        }}"
-      temp_delta: "{{ (state_attr('climate.smart_thermostat', 'temperature') |
-        float) - (states('sensor.thermostat_average_temperature') | float) }}"
-      stage2_delay_used:
-        "{{ states('number.smart_thermostat_stage_2_delay') | int
-        }}"
+      start_temp: "{{ states('sensor.thermostat_average_temperature') | float(21) }}"
+      outdoor_temp: "{{ states('sensor.smart_thermostat_outdoor_temperature') | float(0) }}"
+      setpoint: "{{ state_attr('climate.smart_thermostat', 'temperature') | float(21) }}"
+      temp_delta: "{{ (state_attr('climate.smart_thermostat', 'temperature') | float(21)) - (states('sensor.thermostat_average_temperature') | float(21)) }}"
+      stage2_delay_used: "{{ states('number.smart_thermostat_stage_2_delay') | int(5) }}"
 
 - id: thermal_model_apply_optimal_delay
   alias: "Thermal Model: Apply Optimal Delay"
@@ -313,10 +315,14 @@
     - condition: template
       value_template: "{{ confidence > 35 }}"
 
-    # Only during heating season
-    - condition: numeric_state
-      entity_id: sensor.smart_thermostat_outdoor_temperature
-      below: 15
+    # Only during heating season (below 15°C / 59°F)
+    - condition: template
+      value_template: >
+        {% set outdoor_temp_c = states('sensor.smart_thermostat_outdoor_temperature') | float(100) %}
+        {% if state_attr('sensor.smart_thermostat_outdoor_temperature', 'unit_of_measurement') == '°F' %}
+          {% set outdoor_temp_c = (outdoor_temp_c - 32) * 5 / 9 %}
+        {% endif %}
+        {{ outdoor_temp_c < 15 }}
 
   action:
     # Only update if significantly different (avoid tiny adjustments)
@@ -346,21 +352,21 @@
     - platform: time_pattern
       hours: /6
   condition:
-    - condition: or
-      conditions:
-        - condition: numeric_state
-          entity_id: input_number.thermostat_stage1_heating_rate
-          above: 4.5
-        - condition: numeric_state
-          entity_id: input_number.thermostat_stage1_heating_rate
-          below: 0.6
-        - condition: numeric_state
-          entity_id: input_number.thermostat_heat_loss_coefficient
-          above: 1.8
-        - condition: numeric_state
-          entity_id: input_number.thermostat_heat_loss_coefficient
-          below: 0.15
+    - condition: template
+      value_template: >
+        {% set preset = state_attr('climate.smart_thermostat', 'preset_mode') | lower %}
+        {% set preset = preset if preset in ['home', 'away', 'sleep', 'boost'] else 'home' %}
+        {% set stage1_rate = states('input_number.thermostat_stage1_heating_rate_' + preset) | float(1.5) %}
+        {% set heat_loss_coeff = states('input_number.thermostat_heat_loss_coefficient_' + preset) | float(0.5) %}
+        {{ stage1_rate > 4.5 or stage1_rate < 0.6 or heat_loss_coeff > 1.8 or heat_loss_coeff < 0.15 }}
   variables:
+    active_preset: >
+      {% set preset = state_attr('climate.smart_thermostat', 'preset_mode') | lower %}
+      {% if preset in ['home', 'away', 'sleep', 'boost'] %}
+        {{ preset }}
+      {% else %}
+        home
+      {% endif %}
     model_data: "# Thermal Model Performance Report
 
 
@@ -369,16 +375,16 @@
       - **Thermal Mass (τ)**: {{ states('input_number.thermostat_thermal_mass')
       }} minutes
 
-      - **Heat Loss Coefficient (k)**: {{ states('input_number.thermostat_heat_loss_coefficient')
+      - **Heat Loss Coefficient (k)**: {{ states('input_number.thermostat_heat_loss_coefficient_' + active_preset)
       }} °C/hr/°C
 
-      - **Stage 1 Heating Rate**: {{ states('input_number.thermostat_stage1_heating_rate')
+      - **Stage 1 Heating Rate**: {{ states('input_number.thermostat_stage1_heating_rate_' + active_preset)
       }} °C/hr
 
-      - **Stage 2 Additional Rate**: {{ states('input_number.thermostat_stage2_additional_rate')
+      - **Stage 2 Additional Rate**: {{ states('input_number.thermostat_stage2_additional_rate_' + active_preset)
       }} °C/hr
 
-      - **Model Confidence**: {{ states('input_number.thermostat_model_confidence')
+      - **Model Confidence**: {{ states('input_number.thermostat_model_confidence_' + active_preset)
       }}%
 
       - **Cycles Analyzed**: {{ states('counter.thermostat_cycles_analyzed') }}
@@ -449,22 +455,26 @@
     - service: notify.notify
       data:
         title: ⚠️ Thermal Model Reset
-        message: Model parameters became unreasonable. Resetting to defaults.
+        message: "[{{ active_preset | title }}] Model parameters became unreasonable. Resetting to defaults."
     - service: input_number.set_value
       target:
-        entity_id:
-          - input_number.thermostat_stage1_heating_rate
-          - input_number.thermostat_heat_loss_coefficient
-          - input_number.thermostat_model_confidence
+        entity_id: "input_number.thermostat_stage1_heating_rate_{{ active_preset }}"
       data:
-        value:
-          "{% if 'stage1_heating_rate' in trigger.entity_id %}\n  1.5\n{% elif
-          'heat_loss_coefficient' in trigger.entity_id %}\n  0.5\n{% elif 'model_confidence'
-          in trigger.entity_id %}\n  20\n{% endif %}\n"
+        value: 1.5
+    - service: input_number.set_value
+      target:
+        entity_id: "input_number.thermostat_heat_loss_coefficient_{{ active_preset }}"
+      data:
+        value: 0.5
+    - service: input_number.set_value
+      target:
+        entity_id: "input_number.thermostat_model_confidence_{{ active_preset }}"
+      data:
+        value: 20
     - service: logbook.log
       data:
         name: Thermal Model
-        message: Safety reset triggered - parameters were outside reasonable bounds
+        message: "[{{ active_preset | title }}] Safety reset triggered - parameters were outside reasonable bounds"
 - id: thermostat_maintenance_and_seasonal
   alias: "Thermostat: Maintenance & Seasonal"
   description: Filter reminders, seasonal changes, and annual maintenance
