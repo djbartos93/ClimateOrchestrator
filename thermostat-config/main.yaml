@@ -17,6 +17,9 @@ substitutions:
   wifi_fallback_password: !secret iot_password
   wifi_domain: !secret esp_domain
 
+  ota_pass: !secret ota_password
+  api_key: !secret api_encryption_key
+
   # Logging Configuration
   # Available levels: NONE, ERROR, WARN, INFO, DEBUG, VERBOSE
   log_level_default: "INFO"
@@ -106,20 +109,80 @@ psram:
 
 # Package includes
 # All packages are loaded from GitHub repository for easy updates
-# To use a specific version/tag, change @main to @v1.0.0 (or your tag name)
+# To use a specific version/tag, change ref: main to ref: v1.0.0 (or your tag name)
 packages:
-  network: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/network/wifi.yaml@main
-  # Uncomment for ethernet instead of wifi:
-  # network: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/network/ethernet.yaml@main
+  # WiFi Network Configuration (default)
+  network:
+    url: https://github.com/djbartos93/ClimateOrchestrator
+    files: [thermostat-config/packages/network/wifi.yaml]
+    ref: main
+    
 
-  hardware: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/hardware.yaml@main
-  globals: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/globals.yaml@main
-  sensors: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/sensors.yaml@main
-  switches: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/switches.yaml@main
-  numbers: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/numbers.yaml@main
-  buttons: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/buttons.yaml@main
-  climate: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/climate.yaml@main
-  scripts: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/scripts.yaml@main
-  intervals: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/intervals.yaml@main
-  esphome-core: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/esphome-core.yaml@main
+  # Uncomment for ethernet instead of wifi:
+  # network:
+  #   url: https://github.com/djbartos93/ClimateOrchestrator
+  #   files: [thermostat-config/packages/network/ethernet.yaml]
+  #   ref: main
+  #   
+
+  # Core thermostat packages
+  hardware:
+    url: https://github.com/djbartos93/ClimateOrchestrator
+    files: [thermostat-config/packages/hardware.yaml]
+    ref: main
+    
+
+  globals:
+    url: https://github.com/djbartos93/ClimateOrchestrator
+    files: [thermostat-config/packages/globals.yaml]
+    ref: main
+    
+
+  sensors:
+    url: https://github.com/djbartos93/ClimateOrchestrator
+    files: [thermostat-config/packages/sensors.yaml]
+    ref: main
+    
+
+  switches:
+    url: https://github.com/djbartos93/ClimateOrchestrator
+    files: [thermostat-config/packages/switches.yaml]
+    ref: main
+    
+
+  numbers:
+    url: https://github.com/djbartos93/ClimateOrchestrator
+    files: [thermostat-config/packages/numbers.yaml]
+    ref: main
+    
+
+  buttons:
+    url: https://github.com/djbartos93/ClimateOrchestrator
+    files: [thermostat-config/packages/buttons.yaml]
+    ref: main
+    
+
+  climate:
+    url: https://github.com/djbartos93/ClimateOrchestrator
+    files: [thermostat-config/packages/climate.yaml]
+    ref: main
+    
+
+  scripts:
+    url: https://github.com/djbartos93/ClimateOrchestrator
+    files: [thermostat-config/packages/scripts.yaml]
+    ref: main
+    
+
+  intervals:
+    url: https://github.com/djbartos93/ClimateOrchestrator
+    files: [thermostat-config/packages/intervals.yaml]
+    ref: main
+    
+
+  esphome_core:
+    url: https://github.com/djbartos93/ClimateOrchestrator
+    files: [thermostat-config/packages/esphome-core.yaml]
+    ref: main
+    
 

@@ -19,7 +19,7 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: !secret api_encryption_key
+    key: ${api_key}
   services:
     # Service to receive remote temperature from Home Assistant
     - service: set_remote_temperature
@@ -66,7 +66,7 @@ api:
 # Enable OTA updates
 ota:
   - platform: esphome
-    password: !secret ota_password
+    password: ${ota_pass}
 
 # Enable Web Server for local control
 web_server:
