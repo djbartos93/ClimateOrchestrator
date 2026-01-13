@@ -73,7 +73,7 @@ web_server:
   port: 80
   version: 3
   # Load dashboard layout fix from GitHub
-  js_include: "https://raw.githubusercontent.com/djbartos93/ClimateOrchestrator/main/thermostat-config/layout.js"
+  js_include: layout.js
   sorting_groups:
     - id: group_climate
       name: "🌡️ Climate Control"
