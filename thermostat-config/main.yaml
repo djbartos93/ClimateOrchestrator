@@ -105,19 +105,21 @@ psram:
   speed: 80MHz
 
 # Package includes
+# All packages are loaded from GitHub repository for easy updates
+# To use a specific version/tag, change @main to @v1.0.0 (or your tag name)
 packages:
-  network: !include packages/network/wifi.yaml
+  network: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/network/wifi.yaml@main
   # Uncomment for ethernet instead of wifi:
-  # network: !include packages/network/ethernet.yaml
-  
-  hardware: !include packages/hardware.yaml
-  globals: !include packages/globals.yaml
-  sensors: !include packages/sensors.yaml
-  switches: !include packages/switches.yaml
-  numbers: !include packages/numbers.yaml
-  buttons: !include packages/buttons.yaml
-  climate: !include packages/climate.yaml
-  scripts: !include packages/scripts.yaml
-  intervals: !include packages/intervals.yaml
-  esphome-core: !include packages/esphome-core.yaml
+  # network: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/network/ethernet.yaml@main
+
+  hardware: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/hardware.yaml@main
+  globals: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/globals.yaml@main
+  sensors: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/sensors.yaml@main
+  switches: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/switches.yaml@main
+  numbers: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/numbers.yaml@main
+  buttons: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/buttons.yaml@main
+  climate: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/climate.yaml@main
+  scripts: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/scripts.yaml@main
+  intervals: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/intervals.yaml@main
+  esphome-core: github://djbartos93/ClimateOrchestrator/thermostat-config/packages/esphome-core.yaml@main
 
