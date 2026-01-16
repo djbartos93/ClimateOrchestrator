@@ -395,7 +395,7 @@ thermostat_thermal_model:
 
         # -----------------------------------------------------------------------
         # Optimal Stage 2 Delay - Calculated to hit target cycle time
-        # Uses preset-specific heating rates for calculation
+        # Uses preset-specific heating rates and urgency factors
         # -----------------------------------------------------------------------
         - name: "Optimal Stage 2 Delay"
           unique_id: "1ef45e48-4162-49f3-ba74-22f6681785d9"
@@ -408,10 +408,10 @@ thermostat_thermal_model:
 
             {# If stage 1 alone can hit target, use long delay (stage 2 not needed) #}
             {% if predicted_stage1_only <= target_cycle %}
-              {% set optimal = 15 %}
+              {% set optimal = 30 %}
             {# If both stages can't hit target fast enough, use minimum delay #}
             {% elif predicted_both_stages >= target_cycle %}
-              {% set optimal = 2 %}
+              {% set optimal = 1 %}
             {# Calculate delay to hit target cycle time #}
             {% else %}
               {# Time on stage 1 alone + time on both stages = target #}
@@ -430,12 +430,20 @@ thermostat_thermal_model:
                 {% set stage2_improvement = net_both / net_stage1 %}
                 {% set time_savings = predicted_stage1_only - predicted_both_stages %}
                 {% set optimal = target_cycle - predicted_both_stages %}
-                {% set optimal = [optimal, 2] | max %}
-                {% set optimal = [optimal, 12] | min %}
+                {% set optimal = [optimal, 1] | max %}
+                {% set optimal = [optimal, 20] | min %}
               {% endif %}
             {% endif %}
 
-            {{ optimal | round(0) }}
+            {# Apply preset-specific urgency factor #}
+            {% set urgency = states('sensor.stage2_active_urgency_factor') | float(1.0) %}
+            {% set adjusted = optimal * urgency %}
+
+            {# Ensure result stays within valid range (1-30 min) #}
+            {% set final = [adjusted, 1] | max %}
+            {% set final = [final, 30] | min %}
+
+            {{ final | round(0) }}
 
         # -----------------------------------------------------------------------
         # Heating Efficiency Score (0-100)

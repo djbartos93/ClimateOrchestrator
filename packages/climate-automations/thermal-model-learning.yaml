@@ -13,9 +13,8 @@ thermal_model_learning:
       conditions:
         - condition: template
           value_template:
-            "{{ states('sensor.thermostat_average_temperature') | float(21) >=\n
-            \  state_attr('climate.smart_thermostat', 'temperature') | float(21) - 0.3 }}\n"
-          enabled: false
+            "{{ states('sensor.smart_thermostat_effective_temperature') | float(70) >=\n
+            \  state_attr('climate.smart_thermostat', 'temperature') | float(70) - 0.5 }}\n"
       actions:
         - target:
             entity_id: counter.thermostat_cycles_analyzed
@@ -57,8 +56,33 @@ thermal_model_learning:
                       "{% set new_estimate = observed_heating_rate | float(1.5) %} {% set current
                       = current_stage1_rate | float(1.5) %} {% set lr = learning_rate | float(0.3) %}
                       {% set updated = current * (1 - lr) + new_estimate * lr %} {{ [0.5, [updated,
-                      5.0] | min] | max | round(2) }}
+                      8.0] | min] | max | round(2) }}
 
+                      "
+                  action: input_number.set_value
+            - conditions:
+                - condition: template
+                  value_template: "{{ stage2_was_used }}"
+              sequence:
+                - target:
+                    entity_id: "input_number.thermostat_stage2_additional_rate_{{ active_preset }}"
+                  data:
+                    value:
+                      "{# When stage 2 was used, estimate its additional contribution #}
+                      {% set combined_rate = observed_heating_rate | float(3.0) %}
+                      {% set stage1_only = current_stage1_rate | float(1.5) %}
+                      {% set estimated_stage2_add = combined_rate - stage1_only %}
+
+                      {# Only learn if the estimate is reasonable (positive and not too high) #}
+                      {% if estimated_stage2_add > 0.3 and estimated_stage2_add < 5.0 %}
+                        {% set current_stage2 = states('input_number.thermostat_stage2_additional_rate_' + active_preset) | float(1.8) %}
+                        {% set lr = learning_rate | float(0.3) %}
+                        {% set updated = current_stage2 * (1 - lr) + estimated_stage2_add * lr %}
+                        {{ [0.3, [updated, 5.0] | min] | max | round(2) }}
+                      {% else %}
+                        {# Keep current value if estimate is unreasonable #}
+                        {{ states('input_number.thermostat_stage2_additional_rate_' + active_preset) | float(1.8) }}
+                      {% endif %}
                       "
                   action: input_number.set_value
         - target:
@@ -349,8 +373,13 @@ thermal_model_learning:
             {% set preset = state_attr('climate.smart_thermostat', 'preset_mode') | lower %}
             {% set preset = preset if preset in ['home', 'away', 'sleep', 'boost'] else 'home' %}
             {% set stage1_rate = states('input_number.thermostat_stage1_heating_rate_' + preset) | float(1.5) %}
+            {% set stage2_add = states('input_number.thermostat_stage2_additional_rate_' + preset) | float(1.8) %}
             {% set heat_loss_coeff = states('input_number.thermostat_heat_loss_coefficient_' + preset) | float(0.5) %}
-            {{ stage1_rate > 4.5 or stage1_rate < 0.6 or heat_loss_coeff > 1.8 or heat_loss_coeff < 0.15 }}
+            {# Relaxed bounds for small/efficient houses (825 sqft can heat fast!) #}
+            {# Stage 1: 0.4-8.0 °C/hr, Stage 2 add: 0.2-6.0 °C/hr, Loss coeff: 0.1-2.5 #}
+            {{ stage1_rate > 8.0 or stage1_rate < 0.4 or
+               stage2_add > 6.0 or stage2_add < 0.2 or
+               heat_loss_coeff > 2.5 or heat_loss_coeff < 0.1 }}
       variables:
         active_preset: >
           {% set preset = state_attr('climate.smart_thermostat', 'preset_mode') | lower %}
@@ -447,12 +476,22 @@ thermal_model_learning:
         - service: notify.notify
           data:
             title: ⚠️ Thermal Model Reset
-            message: "[{{ active_preset | title }}] Model parameters became unreasonable. Resetting to defaults."
+            message: >
+              [{{ active_preset | title }}] Model parameters exceeded safety bounds.
+              Stage1: {{ states('input_number.thermostat_stage1_heating_rate_' + active_preset) }}°C/hr,
+              Stage2+: {{ states('input_number.thermostat_stage2_additional_rate_' + active_preset) }}°C/hr,
+              Loss: {{ states('input_number.thermostat_heat_loss_coefficient_' + active_preset) }}.
+              Resetting to defaults.
         - service: input_number.set_value
           target:
             entity_id: "input_number.thermostat_stage1_heating_rate_{{ active_preset }}"
           data:
             value: 1.5
+        - service: input_number.set_value
+          target:
+            entity_id: "input_number.thermostat_stage2_additional_rate_{{ active_preset }}"
+          data:
+            value: 1.8
         - service: input_number.set_value
           target:
             entity_id: "input_number.thermostat_heat_loss_coefficient_{{ active_preset }}"
@@ -466,7 +505,10 @@ thermal_model_learning:
         - service: logbook.log
           data:
             name: Thermal Model
-            message: "[{{ active_preset | title }}] Safety reset triggered - parameters were outside reasonable bounds"
+            message: >
+              [{{ active_preset | title }}] Safety reset: Stage1={{ states('input_number.thermostat_stage1_heating_rate_' + active_preset) }},
+              Stage2+={{ states('input_number.thermostat_stage2_additional_rate_' + active_preset) }},
+              Loss={{ states('input_number.thermostat_heat_loss_coefficient_' + active_preset) }}
     - id: thermostat_maintenance_and_seasonal
       alias: "Thermostat: Maintenance & Seasonal"
       description: Filter reminders, seasonal changes, and annual maintenance
@@ -554,3 +596,67 @@ thermal_model_learning:
                   data:
                     name: Humidifier System
                     message: Humidifier {{ trigger.to_state.state }}
+
+    - id: stage2_disable_button_handler
+      alias: "Stage 2: Disable Button Handler"
+      description: Handle the disable stage 2 button press and start timeout
+      mode: restart
+      trigger:
+        - platform: state
+          entity_id: button.disable_stage2_temporarily
+      action:
+        - service: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.stage2_temporarily_disabled
+        - service: notify.notify
+          data:
+            title: "🔧 Stage 2 Disabled"
+            message: >
+              Stage 2 heating has been temporarily disabled for {{ states('input_number.stage2_disable_timeout') | int }} minutes.
+              It will automatically re-enable at {{ (now() + timedelta(minutes=states('input_number.stage2_disable_timeout') | int)).strftime('%I:%M %p') }}.
+        - service: logbook.log
+          data:
+            name: "Stage 2 Control"
+            message: "Stage 2 disabled for {{ states('input_number.stage2_disable_timeout') | int }} minutes"
+        - delay:
+            minutes: "{{ states('input_number.stage2_disable_timeout') | int }}"
+        - service: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.stage2_temporarily_disabled
+        - service: notify.notify
+          data:
+            title: "✅ Stage 2 Re-Enabled"
+            message: "Stage 2 heating has been automatically re-enabled after timeout."
+        - service: logbook.log
+          data:
+            name: "Stage 2 Control"
+            message: "Stage 2 automatically re-enabled after timeout"
+
+    - id: stage2_large_delta_delay_override
+      alias: "Stage 2: Large Delta Delay Override"
+      description: Set stage 2 delay to 1 minute when large temperature delta detected
+      mode: restart
+      trigger:
+        - platform: state
+          entity_id: binary_sensor.stage2_large_delta_trigger
+          to: "on"
+      condition:
+        - condition: state
+          entity_id: binary_sensor.smart_thermostat_heating_active
+          state: "on"
+      action:
+        - service: number.set_value
+          target:
+            entity_id: number.smart_thermostat_stage_2_delay
+          data:
+            value: 1
+        - service: notify.notify
+          data:
+            title: "⚡ Stage 2 Fast Response"
+            message: >
+              Large temperature change detected ({{ states('sensor.current_temperature_delta') }}°F).
+              Stage 2 delay set to 1 minute for rapid heating.
+        - service: logbook.log
+          data:
+            name: "Stage 2 Control"
+            message: "Large delta trigger: delay set to 1 minute (delta: {{ states('sensor.current_temperature_delta') }}°F)"

@@ -10,6 +10,57 @@ thermostat_helpers:
       icon: mdi:water-percent
       mode: slider
 
+    # Stage 2 disable timeout duration
+    stage2_disable_timeout:
+      name: "Stage 2 Disable Timeout"
+      min: 15
+      max: 240
+      step: 15
+      initial: 120
+      unit_of_measurement: "min"
+      icon: mdi:timer-off-outline
+      mode: box
+
+    # -------------------------------------------------------------------------
+    # Stage 2 Urgency Factors (per preset)
+    # Multiplier applied to optimal delay: <1.0 = faster, >1.0 = slower
+    # -------------------------------------------------------------------------
+    stage2_urgency_home:
+      name: "Stage 2 Urgency: Home"
+      min: 0.3
+      max: 2.0
+      step: 0.1
+      initial: 1.0
+      icon: mdi:home
+      mode: slider
+
+    stage2_urgency_away:
+      name: "Stage 2 Urgency: Away"
+      min: 0.3
+      max: 2.0
+      step: 0.1
+      initial: 1.5
+      icon: mdi:home-export-outline
+      mode: slider
+
+    stage2_urgency_sleep:
+      name: "Stage 2 Urgency: Sleep"
+      min: 0.3
+      max: 2.0
+      step: 0.1
+      initial: 1.2
+      icon: mdi:sleep
+      mode: slider
+
+    stage2_urgency_boost:
+      name: "Stage 2 Urgency: Boost"
+      min: 0.3
+      max: 2.0
+      step: 0.1
+      initial: 0.5
+      icon: mdi:fire
+      mode: slider
+
   # =============================================================================
   # INPUT BOOLEANS
   # =============================================================================
@@ -73,6 +124,14 @@ thermostat_helpers:
       icon: mdi:fridge
       initial: true
 
+    # -------------------------------------------------------------------------
+    # Stage 2 Control
+    # -------------------------------------------------------------------------
+    stage2_temporarily_disabled:
+      name: "Stage 2 Temporarily Disabled"
+      icon: mdi:numeric-2-circle-outline
+      initial: false
+
   # =============================================================================
   # INPUT SELECT
   # =============================================================================
@@ -109,3 +168,12 @@ thermostat_helpers:
       name: "Humidifier Runtime (Minutes)"
       icon: mdi:air-humidifier
       restore: true
+
+  # =============================================================================
+  # BUTTONS
+  # =============================================================================
+  button:
+    # Temporarily disable stage 2 heating
+    disable_stage2_temporarily:
+      name: "Disable Stage 2 Temporarily"
+      icon: mdi:numeric-2-box-outline

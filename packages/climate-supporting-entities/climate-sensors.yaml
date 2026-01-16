@@ -189,6 +189,88 @@ thermostat_stensors:
           unit_of_measurement: "cycles"
           icon: "mdi:fire"
 
+        # -----------------------------------------------------------------------
+        # Stage 2 Control - Time Since Setpoint Change
+        # -----------------------------------------------------------------------
+        - name: "Time Since Setpoint Change"
+          unique_id: "s1t0u6v2-0w4t-1s1x-6u2w-0v7x1s0t1u2v"
+          unit_of_measurement: "min"
+          icon: "mdi:clock-outline"
+          state: >
+            {% if states.climate.smart_thermostat.attributes.temperature is defined %}
+              {{ ((now() - states.climate.smart_thermostat.last_changed).total_seconds() / 60) | round(1) }}
+            {% else %}
+              999
+            {% endif %}
+
+        # -----------------------------------------------------------------------
+        # Stage 2 Control - Time Since Preset Change
+        # -----------------------------------------------------------------------
+        - name: "Time Since Preset Change"
+          unique_id: "t2u1v7w3-1x5u-2t2y-7v3x-1w8y2t1u2v3w"
+          unit_of_measurement: "min"
+          icon: "mdi:clock-outline"
+          state: >
+            {% set preset_attr = state_attr('climate.smart_thermostat', 'preset_mode') %}
+            {% if preset_attr is not none %}
+              {{ ((now() - states.climate.smart_thermostat.last_changed_preset_mode | default(now())).total_seconds() / 60) | round(1) }}
+            {% else %}
+              999
+            {% endif %}
+
+        # -----------------------------------------------------------------------
+        # Stage 2 Control - Current Temperature Delta
+        # -----------------------------------------------------------------------
+        - name: "Current Temperature Delta"
+          unique_id: "u3v2w8x4-2y6v-3u3z-8w4y-2x9z3u2v3w4x"
+          unit_of_measurement: "°F"
+          icon: "mdi:thermometer-lines"
+          device_class: temperature
+          state: >
+            {% set current_temp = states('sensor.smart_thermostat_effective_temperature') | float(70) %}
+            {% set setpoint = state_attr('climate.smart_thermostat', 'temperature') | float(70) %}
+            {{ (setpoint - current_temp) | round(1) }}
+
+        # -----------------------------------------------------------------------
+        # Stage 2 Active Urgency Factor (preset-specific multiplier)
+        # -----------------------------------------------------------------------
+        - name: "Stage 2 Active Urgency Factor"
+          unique_id: "y7z6a2b8-6c0z-7y7d-2a8c-6b3d7y6z7a8b"
+          icon: "mdi:speedometer"
+          state: >
+            {% set preset = states('sensor.active_preset_mode') | lower %}
+            {% if preset == 'home' %}
+              {{ states('input_number.stage2_urgency_home') | float(1.0) }}
+            {% elif preset == 'away' %}
+              {{ states('input_number.stage2_urgency_away') | float(1.5) }}
+            {% elif preset == 'sleep' %}
+              {{ states('input_number.stage2_urgency_sleep') | float(1.2) }}
+            {% elif preset == 'boost' %}
+              {{ states('input_number.stage2_urgency_boost') | float(0.5) }}
+            {% else %}
+              1.0
+            {% endif %}
+
+        # -----------------------------------------------------------------------
+        # DIAGNOSTIC: Losing Ground During Heating
+        # Detects when heating is active but temp is still dropping or flat
+        # -----------------------------------------------------------------------
+        - name: "Heating Cycle Progress"
+          unique_id: "b0c9d5e1-9f3c-0b0g-5d1f-9e6g0b9c0d1e"
+          unit_of_measurement: "°F"
+          icon: "mdi:thermometer-chevron-up"
+          device_class: temperature
+          state: >
+            {% if is_state('binary_sensor.smart_thermostat_heating_active', 'on') %}
+              {% set cycle_data = states('input_text.thermostat_recent_cycles') | from_json %}
+              {% set start_temp = cycle_data.start_temp | float(70) %}
+              {% set current_temp = states('sensor.smart_thermostat_effective_temperature') | float(70) %}
+              {% set progress = current_temp - start_temp %}
+              {{ progress | round(2) }}
+            {% else %}
+              0
+            {% endif %}
+
     - binary_sensor:
         # -----------------------------------------------------------------------
         # System Mismatch Detected (for automation triggering)
@@ -209,6 +291,69 @@ thermostat_stensors:
             {{ is_state('person.eric_bartos', 'not_home') and
               is_state('person.seama', 'not_home') }}
           device_class: occupancy
+
+        # -----------------------------------------------------------------------
+        # Stage 2 Near-Setpoint Inhibit (within 1.5°F of target)
+        # -----------------------------------------------------------------------
+        - name: "Stage 2 Near-Setpoint Inhibit"
+          unique_id: "v4w3x9y5-3z7w-4v4a-9x5z-3y0a4v3w4x5y"
+          icon: "mdi:thermometer-check"
+          state: >
+            {% set delta = states('sensor.current_temperature_delta') | float(5) %}
+            {{ delta <= 1.5 and delta > 0 }}
+
+        # -----------------------------------------------------------------------
+        # Stage 2 Large Delta Trigger (>3°F change in last 5 minutes)
+        # -----------------------------------------------------------------------
+        - name: "Stage 2 Large Delta Trigger"
+          unique_id: "w5x4y0z6-4a8x-5w5b-0y6a-4z1b5w4x5y6z"
+          icon: "mdi:thermometer-alert"
+          state: >
+            {% set delta = states('sensor.current_temperature_delta') | float(0) %}
+            {% set time_since_setpoint = states('sensor.time_since_setpoint_change') | float(999) %}
+            {% set time_since_preset = states('sensor.time_since_preset_change') | float(999) %}
+            {% set recent_change = time_since_setpoint <= 5 or time_since_preset <= 5 %}
+            {{ delta > 3.0 and recent_change }}
+
+        # -----------------------------------------------------------------------
+        # Stage 2 Should Engage (combines all logic)
+        # -----------------------------------------------------------------------
+        - name: "Stage 2 Should Engage"
+          unique_id: "x6y5z1a7-5b9y-6x6c-1z7b-5a2c6x5y6z7a"
+          icon: "mdi:numeric-2-box"
+          state: >
+            {% set disabled = is_state('input_boolean.stage2_temporarily_disabled', 'on') %}
+            {% set inhibit = is_state('binary_sensor.stage2_near_setpoint_inhibit', 'on') %}
+            {% set large_delta = is_state('binary_sensor.stage2_large_delta_trigger', 'on') %}
+            {% set heating = is_state('binary_sensor.smart_thermostat_heating_active', 'on') %}
+
+            {# Don't engage if disabled or near setpoint (unless large delta override) #}
+            {% if disabled %}
+              {{ false }}
+            {% elif inhibit and not large_delta %}
+              {{ false }}
+            {% elif heating %}
+              {{ true }}
+            {% else %}
+              {{ false }}
+            {% endif %}
+
+        # -----------------------------------------------------------------------
+        # DIAGNOSTIC: Losing Ground During Heating
+        # TRUE when heating has been on 5+ min but temp is still dropping
+        # -----------------------------------------------------------------------
+        - name: "Losing Ground While Heating"
+          unique_id: "d2e1f7g3-1h5e-2d2i-8f3h-2g8i3d2e3f4g"
+          icon: "mdi:alert-circle-outline"
+          device_class: problem
+          state: >
+            {% set heating = is_state('binary_sensor.smart_thermostat_heating_active', 'on') %}
+            {% set heating_duration = (now() - states.binary_sensor.smart_thermostat_heating_active.last_changed).total_seconds() / 60 %}
+            {% set progress = states('sensor.heating_cycle_progress') | float(0) %}
+            {% set rate_5min = states('sensor.temperature_change_rate_5min') | float(0) %}
+
+            {# Heating is active for 5+ min but temp dropping or flat #}
+            {{ heating and heating_duration > 5 and (progress <= 0 or rate_5min < -0.02) }}
   # History stats sensors for runtime tracking
   sensor:
     - platform: history_stats
@@ -294,3 +439,36 @@ thermostat_stensors:
       sampling_size: 1000
       max_age:
         days: 7
+
+    # =========================================================================
+    # DIAGNOSTIC SENSORS: Rate of Change Monitoring
+    # These sensors collect data to determine if ROC-based stage 2 logic is needed
+    # =========================================================================
+
+    # Temperature derivative - 5 minute window
+    - platform: derivative
+      name: "Temperature Change Rate (5min)"
+      source: sensor.smart_thermostat_effective_temperature
+      time_window: "00:05:00"
+      unit_time: min
+      unit: "°F"
+      round: 4
+
+    # Temperature derivative - 10 minute window (smoother)
+    - platform: derivative
+      name: "Temperature Change Rate (10min)"
+      source: sensor.smart_thermostat_effective_temperature
+      time_window: "00:10:00"
+      unit_time: min
+      unit: "°F"
+      round: 4
+
+    # Statistics on temperature change during heating (min/max/mean)
+    - platform: statistics
+      name: "Temperature Change Stats During Heating"
+      unique_id: "c1d0e6f2-0g4d-1c1h-6e2g-0f7h1c0d1e2f"
+      entity_id: sensor.temperature_change_rate_5min
+      state_characteristic: mean
+      sampling_size: 50
+      max_age:
+        hours: 1

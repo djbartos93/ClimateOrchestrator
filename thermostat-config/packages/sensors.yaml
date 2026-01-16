@@ -16,6 +16,9 @@ sensor:
             window_size: 3
             send_every: 1
         - heartbeat: 10s
+        - lambda: |-
+            // Apply configurable temperature offset
+            return x + id(local_temp_offset).state;
       on_value:
         then:
           - component.update: effective_temperature
@@ -480,6 +483,13 @@ text_sensor:
 
 # Binary sensors for system state
 binary_sensor:
+
+  # Import stage 2 control logic from Home Assistant
+  - platform: homeassistant
+    name: "Stage 2 Should Engage"
+    id: stage2_should_engage
+    entity_id: binary_sensor.stage2_should_engage
+    internal: true
 
   - platform: status
     id: api_connected_sensor

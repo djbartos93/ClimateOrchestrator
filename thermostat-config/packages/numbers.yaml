@@ -5,7 +5,7 @@ number:
     optimistic: true
     restore_value: true
     min_value: 1
-    max_value: 15
+    max_value: 30
     initial_value: 5
     step: 1
     unit_of_measurement: "min"
@@ -175,6 +175,26 @@ number:
     on_value:
       - lambda: |-
           ESP_LOGI("config", "Fan post-run time (cool) changed to %.0f seconds", x);
+
+# Local DHT22 Temperature Offset
+  - platform: template
+    name: "Local Temperature Offset"
+    id: local_temp_offset
+    optimistic: true
+    restore_value: true
+    min_value: -5.0
+    max_value: 5.0
+    initial_value: 0.0
+    step: 0.1
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-lines"
+    web_server:
+      sorting_group_id: group_climate
+    mode: box
+    on_value:
+      - lambda: |-
+          ESP_LOGI("config", "Local temperature offset changed to %.1f°C", x);
+          id(local_temperature).update();
 
 
 # Buttons

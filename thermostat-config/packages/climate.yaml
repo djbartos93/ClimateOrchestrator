@@ -87,12 +87,21 @@ climate:
       - switch.turn_on: heat_stage1_relay
       - switch.turn_on: fan_relay
       - lambda: 'id(heat_stage1_start_time) = millis();'
-      # STAGE 2: Stage 2 delay and engagement - Comment out the following 7 lines to disable stage 2
+      # STAGE 2: Stage 2 delay and engagement - Comment out the following lines to disable stage 2
       - wait_until:
           timeout: !lambda "return id(stage2_delay_minutes).state * 60 * 1000;"
           condition: {lambda: 'return id(smart_thermostat).action == CLIMATE_ACTION_IDLE;'}
       - if:
-          condition: {lambda: 'return id(smart_thermostat).action == CLIMATE_ACTION_HEATING;'}
+          condition:
+            lambda: |-
+              bool still_heating = id(smart_thermostat).action == CLIMATE_ACTION_HEATING;
+              bool should_engage = id(stage2_should_engage).state;
+
+              if (still_heating && !should_engage) {
+                ESP_LOGW("hvac", "Stage 2 delay elapsed but inhibited by Home Assistant logic");
+              }
+
+              return still_heating && should_engage;
           then:
             - lambda: |-
                 ESP_LOGI("hvac", "Engaging heat stage 2");
