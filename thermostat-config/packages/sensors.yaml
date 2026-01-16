@@ -1,6 +1,7 @@
 sensor:
   - platform: dht
-    pin: 
+    id: dht_sensor
+    pin:
       number: ${pin_dht22}
       mode:
         input: true

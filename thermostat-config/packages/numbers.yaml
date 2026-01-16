@@ -194,7 +194,7 @@ number:
     on_value:
       - lambda: |-
           ESP_LOGI("config", "Local temperature offset changed to %.1f°C", x);
-          id(local_temperature).update();
+      - component.update: dht_sensor
 
 
 # Buttons
