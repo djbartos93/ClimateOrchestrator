@@ -169,12 +169,12 @@ psram:
 # Package includes
 packages:
   # Network Configuration (choose ONE)
+  #- url: https://github.com/djbartos93/ClimateOrchestrator
+  #  ref: *github_ref
+  #  files: [thermostat-config/packages/network/wifi.yaml]
   - url: https://github.com/djbartos93/ClimateOrchestrator
     ref: *github_ref
-    files: [thermostat-config/packages/network/wifi.yaml]
-  # - url: https://github.com/djbartos93/ClimateOrchestrator
-  #   ref: *github_ref
-  #   files: [thermostat-config/packages/network/ethernet.yaml]
+    files: [thermostat-config/packages/network/ethernet.yaml]
 
   - url: https://github.com/djbartos93/ClimateOrchestrator
     ref: *github_ref
