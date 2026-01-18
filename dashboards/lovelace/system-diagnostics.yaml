@@ -1,0 +1,280 @@
+# Diagnostics Dashboard
+# System health, safety monitoring, and troubleshooting dashboard
+# Uses sections layout with Material You theme and built-in cards
+
+title: System Diagnostics
+icon: mdi:doctor
+path: system-diagnostics
+type: sections
+max_columns: 3
+sections:
+
+  # ========================================================================
+  # SECTION 1: System Health Status
+  # ========================================================================
+  - type: grid
+    title: System Health
+    cards:
+      - type: entities
+        title: Connection Status
+        entities:
+          - entity: binary_sensor.smart_thermostat_api_connected
+            name: API Connected
+          - entity: sensor.smart_thermostat_uptime
+            name: Device Uptime
+          - entity: sensor.smart_thermostat_wifi_signal
+            name: WiFi Signal Strength
+          - entity: switch.smart_thermostat_maintenance_mode
+            name: Maintenance Mode
+
+      - type: entities
+        title: Safety Interlocks
+        entities:
+          - entity: binary_sensor.smart_thermostat_boot_lockout_active
+            name: 🚫 Boot Lockout
+          - entity: binary_sensor.smart_thermostat_heat_cool_interlock
+            name: 🚫 Heat/Cool Interlock
+          - entity: binary_sensor.smart_thermostat_compressor_protection
+            name: 🚫 Compressor Protection
+          - entity: binary_sensor.smart_thermostat_runtime_limit
+            name: 🚫 Runtime Limit
+
+      - type: entities
+        title: Device Status
+        entities:
+          - entity: sensor.smart_thermostat_local_temperature
+            name: Local Sensor Temp
+          - entity: sensor.smart_thermostat_local_humidity
+            name: Local Sensor Humidity
+          - entity: binary_sensor.smart_thermostat_dht22_error
+            name: ⚠️ DHT22 Error
+          - entity: sensor.smart_thermostat_free_memory
+            name: Free Memory
+
+  # ========================================================================
+  # SECTION 2: Safety Systems
+  # ========================================================================
+  - type: grid
+    title: Safety Monitoring
+    cards:
+      - type: entities
+        title: Active Safety Checks
+        entities:
+          - entity: binary_sensor.smart_thermostat_heating_active
+            name: Heating Active
+          - entity: binary_sensor.smart_thermostat_cooling_active
+            name: Cooling Active
+          - entity: binary_sensor.smart_thermostat_stage_2_active
+            name: Stage 2 Active
+          - entity: switch.smart_thermostat_humidifier_relay
+            name: Humidifier Active
+
+      - type: entities
+        title: Runtime Monitoring
+        entities:
+          - entity: sensor.smart_thermostat_heat_stage_1_runtime_current
+            name: Stage 1 Runtime (Current)
+          - entity: sensor.smart_thermostat_heat_stage_2_runtime_current
+            name: Stage 2 Runtime (Current)
+          - entity: sensor.smart_thermostat_cooling_runtime_current
+            name: Cooling Runtime (Current)
+          - entity: sensor.smart_thermostat_fan_runtime_current
+            name: Fan Runtime (Current)
+
+      - type: entities
+        title: Emergency Controls
+        entities:
+          - entity: button.smart_thermostat_emergency_stop
+            name: 🚨 Emergency Stop
+            tap_action:
+              action: call-service
+              service: button.press
+              target:
+                entity_id: button.smart_thermostat_emergency_stop
+          - entity: switch.smart_thermostat_maintenance_mode
+            name: Maintenance Mode
+          - entity: button.smart_thermostat_reboot
+            name: Reboot Device
+            tap_action:
+              action: call-service
+              service: button.press
+              target:
+                entity_id: button.smart_thermostat_reboot
+
+  # ========================================================================
+  # SECTION 3: Sensor Diagnostics
+  # ========================================================================
+  - type: grid
+    title: Sensor Diagnostics
+    cards:
+      - type: entities
+        title: Remote Sensor Status
+        entities:
+          - entity: sensor.livingroom_zigbee_temperature_temperature
+            name: Living Room Temp
+          - entity: sensor.bedroom_zigbee_tempurature_temperature
+            name: Bedroom Temp
+          - entity: sensor.kitchen_zigbee_temperature_temperature
+            name: Kitchen Temp
+          - entity: sensor.office_zigbee_temperature_temperature
+            name: Office Temp
+
+      - type: entities
+        title: Sensor Averaging Status
+        entities:
+          - entity: sensor.thermostat_average_temperature
+            name: Calculated Average
+          - entity: sensor.active_temperature_sensor_config
+            name: Active Sensors
+          - entity: binary_sensor.everyone_away
+            name: Occupancy Status
+          - entity: sensor.thermostat_heating_cycles_last_hour
+            name: Cycles Last Hour
+
+      - type: history-graph
+        title: Sensor Availability (24h)
+        hours_to_show: 24
+        entities:
+          - entity: sensor.thermostat_average_temperature
+            name: Average Temp
+          - entity: sensor.smart_thermostat_local_temperature
+            name: Local Sensor
+          - entity: sensor.smart_thermostat_outdoor_temperature
+            name: Outdoor Temp
+
+  # ========================================================================
+  # SECTION 4: Relay & Hardware Status
+  # ========================================================================
+  - type: grid
+    title: Hardware Diagnostics
+    cards:
+      - type: entities
+        title: Relay Status
+        entities:
+          - entity: switch.smart_thermostat_heat_relay
+            name: Heat Relay
+          - entity: switch.smart_thermostat_stage_2_relay
+            name: Stage 2 Relay
+          - entity: switch.smart_thermostat_cool_relay
+            name: Cool Relay
+          - entity: switch.smart_thermostat_fan_relay
+            name: Fan Relay
+          - entity: switch.smart_thermostat_humidifier_relay
+            name: Humidifier Relay
+
+      - type: entities
+        title: Ecobee Passthrough Monitoring
+        entities:
+          - entity: binary_sensor.smart_thermostat_ecobee_heat_stage_1_input
+            name: Ecobee W1 (Heat 1)
+          - entity: binary_sensor.smart_thermostat_ecobee_heat_stage_2_input
+            name: Ecobee W2 (Heat 2)
+          - entity: binary_sensor.smart_thermostat_ecobee_cooling_input
+            name: Ecobee Y1 (Cool)
+          - entity: binary_sensor.smart_thermostat_ecobee_fan_input
+            name: Ecobee G (Fan)
+
+      - type: entities
+        title: System Mismatch Detection
+        entities:
+          - entity: sensor.thermostat_system_mismatch_status
+            name: Mismatch Status
+          - entity: binary_sensor.thermostat_system_mismatch_detected
+            name: ⚠️ Mismatch Detected
+          - entity: switch.smart_thermostat_ecobee_passthrough_mode
+            name: Passthrough Mode
+          - entity: sensor.thermostat_ecobee_passthrough_status
+            name: Control Status
+
+  # ========================================================================
+  # SECTION 5: Performance Metrics
+  # ========================================================================
+  - type: grid
+    title: Performance Metrics
+    cards:
+      - type: entities
+        title: Response Times
+        entities:
+          - entity: sensor.smart_thermostat_api_response_time
+            name: API Response Time
+          - entity: sensor.smart_thermostat_last_update
+            name: Last Update
+          - entity: sensor.smart_thermostat_restart_count
+            name: Restart Count
+          - entity: sensor.smart_thermostat_free_memory
+            name: Free Memory
+
+      - type: sensor
+        entity: sensor.smart_thermostat_uptime
+        name: Device Uptime
+        graph: line
+        detail: 2
+        hours_to_show: 24
+
+      - type: sensor
+        entity: sensor.smart_thermostat_wifi_signal
+        name: WiFi Signal Strength
+        graph: line
+        detail: 2
+        hours_to_show: 24
+
+  # ========================================================================
+  # SECTION 6: Troubleshooting Tools
+  # ========================================================================
+  - type: grid
+    title: Troubleshooting Tools
+    cards:
+      - type: entities
+        title: Common Issues
+        entities:
+          - entity: binary_sensor.losing_ground_while_heating
+            name: ⚠️ Losing Ground
+          - entity: binary_sensor.stage2_should_engage
+            name: Stage 2 Should Engage
+          - entity: binary_sensor.stage2_near_setpoint_inhibit
+            name: Stage 2 Near Setpoint
+          - entity: binary_sensor.stage2_large_delta_trigger
+            name: Stage 2 Large Delta
+
+      - type: entities
+        title: Learning System Status
+        entities:
+          - entity: binary_sensor.sensor_configuration_changed
+            name: ⚠️ Config Changed
+          - entity: sensor.thermal_model_status
+            name: Model Status
+          - entity: counter.thermostat_cycles_analyzed
+            name: Cycles Analyzed
+          - entity: input_datetime.thermostat_last_model_update
+            name: Last Model Update
+
+      - type: markdown
+        title: Troubleshooting Guide
+        content: |
+          ## Common Issues & Solutions
+          
+          ### Stage 2 Not Engaging
+          - Check `stage2_should_engage` status
+          - Verify temperature delta > 3°F
+          - Ensure delay timer has expired
+          - Check if near-setpoint inhibit active
+          
+          ### System Mismatch
+          - Verify Ecobee vs our relay states
+          - Check passthrough mode status
+          - Look for sensor communication issues
+          
+          ### Losing Ground While Heating
+          - Indicates insufficient heating capacity
+          - Check heat loss rate vs heating rate
+          - May need to adjust stage 2 delay
+          
+          ### Sensor Issues
+          - Local sensor failsafe activates
+          - Check Zigbee network connectivity
+          - Verify sensor battery levels
+          
+          ### API Connection Issues
+          - Check WiFi signal strength
+          - Verify Home Assistant connectivity
+          - May need device reboot

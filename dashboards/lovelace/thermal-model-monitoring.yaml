@@ -1,6 +1,6 @@
 # Thermal Model & Stage 2 Control Monitoring Dashboard
-# This dashboard shows all aspects of the thermal model learning system
-# and stage 2 intelligent control features
+# Updated for sections layout with Material You theme compatibility
+# Shows all aspects of the thermal model learning system and stage 2 intelligent control
 
 title: Thermal Model Monitor
 icon: mdi:chart-line

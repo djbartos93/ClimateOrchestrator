@@ -1,0 +1,306 @@
+# Monitoring Dashboard
+# Comprehensive monitoring dashboard for thermal model, efficiency metrics, and historical analysis
+# Uses sections layout with Material You theme and built-in cards
+
+title: Climate Monitoring
+icon: mdi:chart-line
+path: climate-monitoring
+type: sections
+max_columns: 3
+sections:
+
+  # ========================================================================
+  # SECTION 1: Thermal Model Status
+  # ========================================================================
+  - type: grid
+    title: Thermal Model Learning
+    cards:
+      - type: entities
+        title: Model Status
+        entities:
+          - entity: sensor.thermal_model_status
+            name: Current Status
+          - entity: sensor.active_preset_mode
+            name: Active Preset
+          - entity: counter.thermostat_cycles_analyzed
+            name: Cycles Analyzed
+          - entity: input_datetime.thermostat_last_model_update
+            name: Last Update
+          - entity: binary_sensor.sensor_configuration_changed
+            name: ⚠️ Config Changed
+
+      - type: gauge
+        entity: input_number.thermostat_model_confidence_home
+        name: Model Confidence
+        min: 0
+        max: 100
+        needle: true
+        severity:
+          green: 80
+          yellow: 60
+          red: 40
+
+      - type: entities
+        title: Current Preset Parameters
+        entities:
+          - entity: input_number.thermostat_heat_loss_coefficient_home
+            name: Heat Loss Coefficient
+          - entity: input_number.thermostat_stage1_heating_rate_home
+            name: Stage 1 Rate
+          - entity: input_number.thermostat_stage2_additional_rate_home
+            name: Stage 2 Rate
+          - entity: input_number.thermostat_thermal_mass
+            name: Thermal Mass
+
+  # ========================================================================
+  # SECTION 2: Predictions & Calculations
+  # ========================================================================
+  - type: grid
+    title: Thermal Predictions
+    cards:
+      - type: entities
+        title: Time to Setpoint
+        entities:
+          - entity: sensor.predicted_time_to_setpoint_stage_1
+            name: Stage 1 Only (min)
+          - entity: sensor.predicted_time_to_setpoint_stage_1_2
+            name: Stage 1+2 (min)
+          - entity: sensor.optimal_stage_2_delay
+            name: Optimal Stage 2 Delay
+          - entity: input_number.thermostat_target_cycle_time
+            name: Target Cycle Time
+
+      - type: entities
+        title: Heat Loss & Gain
+        entities:
+          - entity: sensor.current_heat_loss_rate
+            name: Current Heat Loss
+          - entity: sensor.current_temperature_delta
+            name: Temperature to Setpoint
+          - entity: binary_sensor.stage_2_recommended
+            name: Stage 2 Recommended
+          - entity: sensor.heating_cycle_progress
+            name: Cycle Progress
+
+      - type: gauge
+        entity: sensor.current_heat_loss_rate
+        name: Heat Loss Rate
+        min: 0
+        max: 3
+        needle: true
+        severity:
+          green: 0.5
+          yellow: 1.5
+          red: 2.5
+
+  # ========================================================================
+  # SECTION 3: All Presets Comparison
+  # ========================================================================
+  - type: grid
+    title: All Presets Learning Summary
+    cards:
+      - type: entities
+        title: Home Mode Parameters
+        entities:
+          - entity: input_number.thermostat_heat_loss_coefficient_home
+            name: Heat Loss Coefficient
+          - entity: input_number.thermostat_stage1_heating_rate_home
+            name: Stage 1 Rate
+          - entity: input_number.thermostat_stage2_additional_rate_home
+            name: Stage 2 Rate
+          - entity: input_number.thermostat_model_confidence_home
+            name: Confidence
+
+      - type: entities
+        title: Away Mode Parameters
+        entities:
+          - entity: input_number.thermostat_heat_loss_coefficient_away
+            name: Heat Loss Coefficient
+          - entity: input_number.thermostat_stage1_heating_rate_away
+            name: Stage 1 Rate
+          - entity: input_number.thermostat_stage2_additional_rate_away
+            name: Stage 2 Rate
+          - entity: input_number.thermostat_model_confidence_away
+            name: Confidence
+
+      - type: entities
+        title: Sleep Mode Parameters
+        entities:
+          - entity: input_number.thermostat_heat_loss_coefficient_sleep
+            name: Heat Loss Coefficient
+          - entity: input_number.thermostat_stage1_heating_rate_sleep
+            name: Stage 1 Rate
+          - entity: input_number.thermostat_stage2_additional_rate_sleep
+            name: Stage 2 Rate
+          - entity: input_number.thermostat_model_confidence_sleep
+            name: Confidence
+
+      - type: entities
+        title: Boost Mode Parameters
+        entities:
+          - entity: input_number.thermostat_heat_loss_coefficient_boost
+            name: Heat Loss Coefficient
+          - entity: input_number.thermostat_stage1_heating_rate_boost
+            name: Stage 1 Rate
+          - entity: input_number.thermostat_stage2_additional_rate_boost
+            name: Stage 2 Rate
+          - entity: input_number.thermostat_model_confidence_boost
+            name: Confidence
+
+  # ========================================================================
+  # SECTION 4: Efficiency & Performance
+  # ========================================================================
+  - type: grid
+    title: System Efficiency
+    cards:
+      - type: gauge
+        entity: sensor.heating_efficiency_score
+        name: Heating Efficiency Score
+        min: 0
+        max: 100
+        needle: true
+        severity:
+          green: 80
+          yellow: 60
+          red: 40
+
+      - type: entities
+        title: Today's Performance
+        entities:
+          - entity: sensor.heating_runtime_today
+            name: Heating Runtime
+          - entity: sensor.cooling_runtime_today
+            name: Cooling Runtime
+          - entity: counter.thermostat_heating_cycles_today
+            name: Heating Cycles
+          - entity: counter.thermostat_cooling_cycles_today
+            name: Cooling Cycles
+
+      - type: entities
+        title: Weekly Performance
+        entities:
+          - entity: sensor.heating_runtime_this_week
+            name: Weekly Heating
+          - entity: sensor.heating_cycles_this_week
+            name: Weekly Heating Cycles
+          - entity: sensor.stage_2_runtime_this_week
+            name: Stage 2 Runtime
+          - entity: sensor.outdoor_temperature_avg_week
+            name: Weekly Outdoor Avg
+
+  # ========================================================================
+  # SECTION 5: Historical Trends
+  # ========================================================================
+  - type: grid
+    title: Historical Analysis
+    cards:
+      - type: history-graph
+        title: Temperature Trends (24h)
+        hours_to_show: 24
+        entities:
+          - entity: sensor.thermostat_average_temperature
+            name: Indoor Average
+          - entity: sensor.smart_thermostat_outdoor_temperature
+            name: Outdoor
+          - entity: state_attr('climate.smart_thermostat', 'temperature')
+            name: Setpoint
+
+      - type: history-graph
+        title: HVAC Activity (24h)
+        hours_to_show: 24
+        entities:
+          - entity: binary_sensor.smart_thermostat_heating_active
+            name: Heating
+          - entity: binary_sensor.smart_thermostat_stage_2_active
+            name: Stage 2
+          - entity: binary_sensor.smart_thermostat_cooling_active
+            name: Cooling
+          - entity: switch.smart_thermostat_humidifier_relay
+            name: Humidifier
+
+      - type: history-graph
+        title: Humidity Trends (24h)
+        hours_to_show: 24
+        entities:
+          - entity: sensor.thermostat_average_humidity
+            name: Indoor Humidity
+          - entity: sensor.humidifier_effective_setpoint
+            name: Target Humidity
+          - entity: sensor.smart_thermostat_outdoor_humidity
+            name: Outdoor Humidity
+
+  # ========================================================================
+  # SECTION 6: Rate of Change Analysis
+  # ========================================================================
+  - type: grid
+    title: Rate of Change Diagnostics
+    cards:
+      - type: entities
+        title: Temperature Change Rates
+        entities:
+          - entity: sensor.temperature_change_rate_5min
+            name: 5-Min Rate
+          - entity: sensor.temperature_change_rate_10min
+            name: 10-Min Rate
+          - entity: binary_sensor.losing_ground_while_heating
+            name: ⚠️ Losing Ground
+          - entity: sensor.heating_cycle_progress
+            name: Cycle Progress
+
+      - type: sensor
+        entity: sensor.thermostat_average_temperature
+        name: Temperature Trend (4h)
+        graph: line
+        detail: 2
+        hours_to_show: 4
+
+      - type: sensor
+        entity: sensor.current_heat_loss_rate
+        name: Heat Loss Rate Trend (4h)
+        graph: line
+        detail: 2
+        hours_to_show: 4
+
+  # ========================================================================
+  # SECTION 7: Control Mode Analysis
+  # ========================================================================
+  - type: grid
+    title: Control Mode Analysis
+    cards:
+      - type: entities
+        title: Control Time Distribution
+        entities:
+          - entity: sensor.smart_thermostat_control_time_today
+            name: Smart Control Today
+          - entity: sensor.ecobee_control_time_today
+            name: Ecobee Control Today
+          - entity: sensor.thermostat_ecobee_passthrough_status
+            name: Current Control Mode
+          - entity: sensor.thermostat_system_mismatch_status
+            name: System Sync Status
+
+      - type: pie-chart
+        title: Control Time Split (Today)
+        entities:
+          - entity: sensor.smart_thermostat_control_time_today
+            name: Smart Control
+          - entity: sensor.ecobee_control_time_today
+            name: Ecobee Control
+
+      - type: markdown
+        title: Performance Insights
+        content: |
+          ## Efficiency Metrics
+          - **Optimal Stage 2 Usage**: 20-30% of total heating time
+          - **Optimal Cycling**: 4-8 heating cycles per day
+          - **High Efficiency**: Score >80%
+          
+          ## Learning Progress
+          - Model confidence increases with each heating cycle
+          - Different presets learn independently
+          - Configuration changes require recalibration
+          
+          ## Heat Loss Analysis
+          - Higher heat loss = more frequent cycling
+          - Compare indoor/outdoor temperature differential
+          - Track changes over seasons

@@ -1,0 +1,339 @@
+# Climate Orchestrator Unified Dashboard
+# Single dashboard with multiple views (tabs) for complete thermostat control
+# Uses Home Assistant views with sections layout and Material You theme compatibility
+
+# View 1: Climate Control
+views:
+  - title: Climate Control
+    icon: mdi:home-thermostat
+    path: climate-control
+    type: sections
+    max_columns: 3
+    sections:
+      - heading: Temperature Control
+        cards:
+          - type: thermostat
+            entity: climate.smart_thermostat
+            name: Smart Thermostat
+          - type: entities
+            entities:
+              - entity: sensor.smart_thermostat_local_temperature
+                name: Indoor Temperature
+              - entity: sensor.smart_thermostat_local_humidity
+                name: Indoor Humidity
+              - entity: sensor.thermostat_average_temperature
+                name: Average Temperature
+              - entity: sensor.thermostat_average_humidity
+                name: Average Humidity
+            title: Environmental Status
+          - type: gauge
+            entity: sensor.smart_thermostat_local_temperature
+            name: Temperature
+            min: 50
+            max: 90
+            severity:
+              green: 68
+              yellow: 72
+              red: 76
+      - heading: System Status
+        cards:
+          - type: entities
+            entities:
+              - entity: climate.smart_thermostat
+                name: Thermostat Status
+              - entity: binary_sensor.smart_thermostat_heating_active
+                name: Heating Active
+              - entity: binary_sensor.smart_thermostat_cooling_active
+                name: Cooling Active
+              - entity: binary_sensor.smart_thermostat_fan_running
+                name: Fan Running
+            title: HVAC Status
+          - type: history-graph
+            entities:
+              - entity: climate.smart_thermostat
+              - entity: sensor.smart_thermostat_local_temperature
+            hours_to_show: 24
+            refresh_interval: 60
+      - heading: Quick Actions
+        cards:
+          - type: entities
+            entities:
+              - entity: input_boolean.thermostat_ecobee_passthrough_on_vacation
+                name: Away Mode
+              - entity: input_boolean.thermostat_humidifier_manual_setpoint
+                name: Eco Mode
+              - entity: input_boolean.thermostat_use_kitchen_temp
+                name: Kitchen Temperature
+                tap_action:
+                  action: toggle
+              - entity: input_boolean.thermostat_use_office_temp
+                name: Boost Mode
+                tap_action:
+                  action: toggle
+            title: Mode Controls
+          - type: button
+            entity: script.thermostat_reset_daily_stats
+            name: Reset Daily Stats
+            tap_action:
+              action: call-service
+              service: script.thermostat_reset_daily_stats
+
+# View 2: Configuration
+  - title: Configuration
+    icon: mdi:cog
+    path: configuration
+    type: sections
+    max_columns: 3
+    sections:
+      - heading: Sensor Selection
+        cards:
+          - type: entities
+            entities:
+              - entity: input_boolean.thermostat_use_living_room_temp
+                name: Living Room Temperature
+              - entity: input_boolean.thermostat_use_bedroom_temp
+                name: Bedroom Temperature
+              - entity: input_boolean.thermostat_use_kitchen_temp
+                name: Kitchen Temperature
+              - entity: input_boolean.thermostat_use_office_temp
+                name: Office Temperature
+            title: Temperature Sensors
+          - type: entities
+            entities:
+              - entity: input_boolean.thermostat_use_living_room_humidity
+                name: Living Room Humidity
+              - entity: input_boolean.thermostat_use_bedroom_humidity
+                name: Bedroom Humidity
+              - entity: input_boolean.thermostat_use_kitchen_humidity
+                name: Kitchen Humidity
+              - entity: input_boolean.thermostat_use_office_humidity
+                name: Office Humidity
+            title: Humidity Sensors
+      - heading: Humidifier Settings
+        cards:
+          - type: entities
+            entities:
+              - entity: input_number.thermostat_humidifier_manual_setpoint
+                name: Humidifier Setpoint
+              - entity: input_boolean.thermostat_humidifier_manual_setpoint
+                name: Manual Setpoint Mode
+              - entity: switch.thermostat_humidifier_relay
+                name: Humidifier Switch
+            title: Humidity Control
+      - heading: House Configuration
+        cards:
+          - type: entities
+            entities:
+              - entity: input_select.thermostat_house_mode
+                name: House Mode
+              - entity: input_boolean.thermostat_ecobee_passthrough_on_vacation
+                name: Auto Ecobee on Vacation
+            title: House Settings
+      - heading: Thermal Model Parameters
+        cards:
+          - type: entities
+            entities:
+              - entity: input_number.thermostat_thermal_mass
+                name: Thermal Mass
+              - entity: input_number.thermostat_heat_loss_coefficient_home
+                name: Heat Loss (Home)
+              - entity: input_number.thermostat_stage1_heating_rate_home
+                name: Heating Rate (Home)
+            title: Home Preset
+          - type: entities
+            entities:
+              - entity: input_number.thermostat_heat_loss_coefficient_away
+                name: Heat Loss (Away)
+              - entity: input_number.thermostat_stage1_heating_rate_away
+                name: Heating Rate (Away)
+              - entity: input_number.thermostat_target_cycle_time
+                name: Target Cycle Time
+            title: Away Preset
+
+# View 3: Monitoring & Analytics
+  - title: Monitoring & Analytics
+    icon: mdi:chart-line
+    path: monitoring
+    type: sections
+    max_columns: 3
+    sections:
+      - heading: Thermal Model Status
+        cards:
+          - type: entities
+            entities:
+              - entity: sensor.thermal_model_status
+                name: Model Status
+              - entity: input_number.thermostat_model_confidence_home
+                name: Confidence (Home)
+              - entity: input_number.thermostat_model_confidence_away
+                name: Confidence (Away)
+            title: Model Health
+          - type: gauge
+            entity: input_number.thermostat_model_confidence_home
+            name: Model Confidence
+            min: 0
+            max: 100
+            severity:
+              green: 80
+              yellow: 60
+              red: 40
+      - heading: Predictions & Analysis
+        cards:
+          - type: entities
+            entities:
+              - entity: sensor.predicted_time_to_setpoint_stage_1
+                name: Time to Setpoint
+              - entity: sensor.current_heat_loss_rate
+                name: Heat Loss Rate
+              - entity: sensor.heating_efficiency_score
+                name: Efficiency Score
+            title: Predictions
+          - type: history-graph
+            entities:
+              - entity: sensor.predicted_time_to_setpoint_stage_1
+              - entity: sensor.heating_efficiency_score
+            hours_to_show: 24
+            refresh_interval: 60
+      - heading: Performance Metrics
+        cards:
+          - type: entities
+            entities:
+              - entity: sensor.heating_runtime_today
+                name: Heating Runtime
+              - entity: sensor.cooling_runtime_today
+                name: Cooling Runtime
+              - entity: counter.thermostat_heating_cycles_today
+                name: Heating Cycles
+            title: Today's Performance
+          - type: statistics-graph
+            entities:
+              - entity: sensor.heating_runtime_today
+              - entity: sensor.cooling_runtime_today
+            chart_type: line
+            period: hour
+            stat_type: mean
+
+# View 4: System Diagnostics
+  - title: System Diagnostics
+    icon: mdi:tools
+    path: diagnostics
+    type: sections
+    max_columns: 3
+    sections:
+      - heading: System Health
+        cards:
+          - type: entities
+            entities:
+              - entity: binary_sensor.thermostat_system_mismatch_detected
+                name: System Mismatch
+              - entity: binary_sensor.sensor_configuration_changed
+                name: Config Changed
+              - entity: climate.smart_thermostat
+                name: Thermostat Online
+            title: Health Status
+          - type: logbook
+            entities:
+              - entity: binary_sensor.thermostat_system_mismatch_detected
+              - entity: binary_sensor.sensor_configuration_changed
+            hours_to_show: 24
+      - heading: Sensor Diagnostics
+        cards:
+          - type: entities
+            entities:
+              - entity: sensor.livingroom_zigbee_temperature_temperature
+                name: Living Room Temp
+              - entity: sensor.bedroom_zigbee_tempurature_temperature
+                name: Bedroom Temp
+              - entity: sensor.kitchen_zigbee_temperature_temperature
+                name: Kitchen Temp
+              - entity: sensor.office_zigbee_temperature_temperature
+                name: Office Temp
+            title: Temperature Sensors
+          - type: entities
+            entities:
+              - entity: sensor.livingroom_zigbee_temperature_humidity
+                name: Living Room Humidity
+              - entity: sensor.bedroom_zigbee_tempurature_humidity
+                name: Bedroom Humidity
+              - entity: sensor.kitchen_zigbee_temperature_humidity
+                name: Kitchen Humidity
+              - entity: sensor.office_zigbee_temperature_humidity
+                name: Office Humidity
+            title: Humidity Sensors
+      - heading: Hardware Diagnostics
+        cards:
+          - type: entities
+            entities:
+              - entity: sensor.uptime
+                name: ESP32 Uptime
+              - entity: sensor.free_heap
+                name: Free Memory
+              - entity: sensor.wifi_signal_strength
+                name: WiFi Signal
+            title: Hardware Status
+
+# View 5: Advanced Thermal Model
+  - title: Advanced Thermal Model
+    icon: mdi:chart-bell-curve
+    path: thermal-model
+    type: sections
+    max_columns: 3
+    sections:
+      - heading: Current Heating Cycle
+        cards:
+          - type: entities
+            entities:
+              - entity: sensor.predicted_time_to_setpoint_stage_1_2
+                name: Time to Setpoint (S1+S2)
+              - entity: sensor.optimal_stage_2_delay
+                name: Optimal Stage 2 Delay
+              - entity: binary_sensor.stage_2_recommended
+                name: Stage 2 Recommended
+            title: Cycle Status
+          - type: history-graph
+            entities:
+              - entity: binary_sensor.smart_thermostat_heating_active
+              - entity: binary_sensor.smart_thermostat_cooling_active
+              - entity: sensor.predicted_time_to_setpoint_stage_1
+            hours_to_show: 6
+            refresh_interval: 30
+      - heading: Stage 2 Intelligent Control
+        cards:
+          - type: entities
+            entities:
+              - entity: binary_sensor.stage_2_recommended
+                name: Stage 2 Needed
+              - entity: sensor.optimal_stage_2_delay
+                name: Urgency Factor
+              - entity: sensor.heating_efficiency_score
+                name: Predicted Savings
+            title: Stage 2 Control
+          - type: gauge
+            entity: sensor.optimal_stage_2_delay
+            name: Urgency Factor
+            min: 0
+            max: 10
+            severity:
+              green: 3
+              yellow: 6
+              red: 8
+      - heading: Preset Urgency Factors
+        cards:
+          - type: entities
+            entities:
+              - entity: input_number.thermostat_model_confidence_home
+                name: Home Preset
+              - entity: input_number.thermostat_model_confidence_away
+                name: Away Preset
+              - entity: input_number.thermostat_model_confidence_sleep
+                name: Sleep Preset
+              - entity: input_number.thermostat_model_confidence_boost
+                name: Boost Preset
+            title: Urgency by Preset
+          - type: bar-chart
+            entities:
+              - entity: input_number.thermostat_model_confidence_home
+              - entity: input_number.thermostat_model_confidence_away
+              - entity: input_number.thermostat_model_confidence_sleep
+              - entity: input_number.thermostat_model_confidence_boost
+            title: Urgency Comparison
