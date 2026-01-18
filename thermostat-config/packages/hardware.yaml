@@ -31,7 +31,7 @@ rtttl:
   output: buzzer_out
   id: my_buzzer
 
-captive_portal:
+
 
 # LED configuration
 light:

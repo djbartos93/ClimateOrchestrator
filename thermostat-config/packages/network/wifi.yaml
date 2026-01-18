@@ -16,3 +16,21 @@ wifi:
       - rtttl.play: "wifi:d=8,o=6,b=200:g,g"
       - lambda: |-
           ESP_LOGI("network", "WiFi connection established");
+
+captive_portal:
+
+# WiFi Signal Strength - only available when using WiFi
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    web_server:
+      sorting_group_id: group_runtimes
+    update_interval: 60s
+
+# WiFi Info - only available when using WiFi
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+    ssid:
+      name: "SSID"

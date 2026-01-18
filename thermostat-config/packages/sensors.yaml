@@ -1,6 +1,7 @@
 sensor:
   - platform: dht
-    pin: 
+    id: dht_sensor
+    pin:
       number: ${pin_dht22}
       mode:
         input: true
@@ -16,6 +17,9 @@ sensor:
             window_size: 3
             send_every: 1
         - heartbeat: 10s
+        - lambda: |-
+            // Apply configurable temperature offset
+            return x + id(local_temp_offset).state;
       on_value:
         then:
           - component.update: effective_temperature
@@ -315,13 +319,6 @@ sensor:
       then:
         - script.execute: update_humidifier_state
 
-  # WiFi Signal Strength
-  - platform: wifi_signal
-    name: "WiFi Signal"
-    web_server:
-      sorting_group_id: group_runtimes
-    update_interval: 60s
-
   # Uptime Sensor
   - platform: uptime
     name: "Uptime"
@@ -397,12 +394,6 @@ sensor:
 
 # Text sensors for status
 text_sensor:
-  - platform: wifi_info
-    ip_address:
-      name: "IP Address"
-    ssid:
-      name: "SSID"
-
 # Dispaly ESPHome version in the dashboard
   - platform: version
     name: "ESPHome Version"
@@ -480,6 +471,13 @@ text_sensor:
 
 # Binary sensors for system state
 binary_sensor:
+
+  # Import stage 2 control logic from Home Assistant
+  - platform: homeassistant
+    name: "Stage 2 Should Engage"
+    id: stage2_should_engage
+    entity_id: binary_sensor.stage2_should_engage
+    internal: true
 
   - platform: status
     id: api_connected_sensor

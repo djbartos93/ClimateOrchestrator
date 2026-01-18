@@ -48,15 +48,27 @@ globals:
     initial_value: '0'
 
   # Persistent tracking for reboot protection
-  - id: last_heat_off_time_persistent
-    type: unsigned long
+  # Track if HVAC was actively running when device shut down/rebooted
+  - id: was_heating_on_shutdown
+    type: bool
     restore_value: yes
+    initial_value: 'false'
+
+  - id: was_cooling_on_shutdown
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+
+  # Boot sequence tracking
+  - id: boot_time
+    type: unsigned long
+    restore_value: no
     initial_value: '0'
 
-  - id: last_cool_off_time_persistent
-    type: unsigned long
-    restore_value: yes
-    initial_value: '0'
+  - id: temp_grace_period_active
+    type: bool
+    restore_value: no
+    initial_value: 'true'  # Start in grace period, cleared after timeout or API temp received
 
   - id: filter_runtime_minutes
     type: int

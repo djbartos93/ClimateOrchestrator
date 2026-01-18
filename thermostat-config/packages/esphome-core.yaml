@@ -29,6 +29,11 @@ api:
         - lambda: |-
             id(remote_temperature_override).publish_state(temperature);
             id(last_remote_temp_update) = millis();
+            // End temperature grace period - we have a valid remote temp now
+            if (id(temp_grace_period_active)) {
+              id(temp_grace_period_active) = false;
+              ESP_LOGI("remote_temp", "Temperature grace period ended - API temperature received");
+            }
             ESP_LOGI("remote_temp", "Received remote temperature: %.1f°C", temperature);
         - script.execute: update_status_led
 
@@ -72,6 +77,7 @@ ota:
 web_server:
   port: 80
   version: 3
+  ota: true
   # Load dashboard layout fix from GitHub
   js_include: layout.js
   sorting_groups:
@@ -93,3 +99,6 @@ web_server:
     - id: group_maintenance
       name: "🛠️ Maintenance (RELAYS)"
       sorting_weight: 6
+
+mdns:
+  disabled: true

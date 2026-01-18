@@ -64,7 +64,7 @@ substitutions:
 ####################################
 
 # Last build number / device
-  config_version: "0.3.6 - MBP Build"
+  config_version: "0.4.0-Improved Boot Lockout"
 
 # Timing Constants (all in seconds)
 # sensable defaults are in place
@@ -78,7 +78,13 @@ substitutions:
 # Temperature Settings
   default_heat_setpoint: "21.0"  # 70°F
   default_cool_setpoint: "24.0"  # 75°F
-  temp_deadband: "0.5"  # Temperature deadband in °C
+
+  # Deadband: how far BELOW setpoint before heating starts / ABOVE setpoint before cooling starts
+  # Overrun: how far ABOVE setpoint before heating stops / BELOW setpoint before cooling stops
+  heat_deadband: "0.5"
+  heat_overrun: "0.5"
+  cool_deadband: "0.5"
+  cool_overrun: "0.5"
 
 
 
@@ -90,17 +96,59 @@ esphome:
     then:
       - lambda: |-
           ESP_LOGI("boot", "Smart Thermostat booting...");
+          // Record boot time for grace period calculations
+          id(boot_time) = millis();
+          // Initialize remote timestamps to boot time - gives API a fair chance during grace period
+          // Instead of starting at 0 (which would immediately mark them as stale)
           id(last_remote_temp_update) = millis();
           id(last_remote_humidity_update) = millis();
+          // Temperature grace period is active until API sends first temp or timeout
+          id(temp_grace_period_active) = true;
           ESP_LOGI("boot", "Runtime counters restored from flash");
       - rtttl.play: "boot:d=16,o=5,b=160:c,e,g" # Quick ascending chirp
+      # Check if HVAC cycle was interrupted by previous shutdown/reboot
       - lambda: |-
-          ESP_LOGI("boot", "Hardware initialized - entering 60s boot lockout");
-      - delay: 60s
+          bool heating_interrupted = id(was_heating_on_shutdown);
+          bool cooling_interrupted = id(was_cooling_on_shutdown);
+
+          if (heating_interrupted || cooling_interrupted) {
+            ESP_LOGW("boot", "INTERRUPTED CYCLE DETECTED - %s was running on shutdown",
+                     heating_interrupted ? "HEATING" : "COOLING");
+            ESP_LOGW("boot", "Extended boot lockout will be applied (%.0f minutes)",
+                     id(interrupted_cycle_lockout_minutes).state);
+          } else {
+            ESP_LOGI("boot", "No interrupted cycle detected - normal boot lockout");
+          }
+          ESP_LOGI("boot", "Hardware initialized - entering boot lockout");
+      # Wait for interrupted cycle lockout if applicable
+      - if:
+          condition:
+            lambda: 'return id(was_heating_on_shutdown) || id(was_cooling_on_shutdown);'
+          then:
+            - lambda: |-
+                ESP_LOGW("safety", "Interrupted cycle lockout: waiting %.0f minutes before allowing HVAC",
+                         id(interrupted_cycle_lockout_minutes).state);
+            - delay: !lambda "return id(interrupted_cycle_lockout_minutes).state * 60 * 1000;"
+            - lambda: |-
+                // Clear the interrupted cycle flags after lockout served
+                id(was_heating_on_shutdown) = false;
+                id(was_cooling_on_shutdown) = false;
+                ESP_LOGI("safety", "Interrupted cycle lockout complete - flags cleared");
+          else:
+            # Normal boot - still wait 60s for safety
+            - delay: 60s
+      # Release boot lockout via timeout if API hasn't connected yet
       - lambda: |-
           if (id(boot_lockout)) {
             id(boot_lockout) = false;
             ESP_LOGW("safety", "Boot lockout released via timeout (API still offline)");
+          }
+      # End temperature grace period after configured time if still active
+      - delay: !lambda "return id(boot_temp_grace_period_seconds).state * 1000;"
+      - lambda: |-
+          if (id(temp_grace_period_active)) {
+            id(temp_grace_period_active) = false;
+            ESP_LOGI("boot", "Temperature grace period ended - using available sensors");
           }
 #Hardware setup, only change if using different/custom hardware
 esp32:
@@ -108,6 +156,12 @@ esp32:
   flash_size: 16MB
   framework:
     type: esp-idf
+    sdkconfig_options:
+      CONFIG_LWIP_MAX_SOCKETS: "16"
+      CONFIG_LWIP_SOCKET_OFFSET: "64"
+      CONFIG_LWIP_TCPIP_RECVMBOX_SIZE: "64"
+      CONFIG_LWIP_TCP_RECVMBOX_SIZE: "64"
+    
 psram:
   mode: octal
   speed: 80MHz
@@ -118,18 +172,16 @@ psram:
 # Examples: "main", "feature/stage2-phase2-preset-urgency", "v1.0.0"
 packages:
   # WiFi Network Configuration (default)
-  network:
-    url: https://github.com/djbartos93/ClimateOrchestrator
-    files: [thermostat-config/packages/network/wifi.yaml]
-    ref: ${github_ref}
-    
+ # network:
+ #   url: https://github.com/djbartos93/ClimateOrchestrator
+ #   files: [thermostat-config/packages/network/wifi.yaml]
+ #   ref: feature/stage2-phase2-preset-urgency
 
   # Uncomment for ethernet instead of wifi:
-  # network:
-  #   url: https://github.com/djbartos93/ClimateOrchestrator
-  #   files: [thermostat-config/packages/network/ethernet.yaml]
-  #   ref: ${github_ref}
-  #
+  network:
+    url: https://github.com/djbartos93/ClimateOrchestrator
+    files: [thermostat-config/packages/network/ethernet.yaml]
+    ref: ${github_ref}
 
   # Core thermostat packages
   hardware:
