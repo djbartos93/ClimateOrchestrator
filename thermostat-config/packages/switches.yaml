@@ -26,11 +26,19 @@ switch:
     name: "Heat Stage 1 Relay"
     internal: true
     on_turn_on:
-      - lambda: 'id(heat_stage1_start_time) = millis();'
+      - lambda: |-
+          id(heat_stage1_start_time) = millis();
+          // Track for reboot protection - persists across reboots
+          id(was_heating_on_shutdown) = true;
+          ESP_LOGD("reboot_protection", "Heating started - tracking for reboot protection");
       # Check humidifier when heating starts
       - script.execute: update_humidifier_state
     on_turn_off:
-      - lambda: 'id(heat_stage1_start_time) = 0;'
+      - lambda: |-
+          id(heat_stage1_start_time) = 0;
+          // Clear reboot protection flag - heating cycle completed normally
+          id(was_heating_on_shutdown) = false;
+          ESP_LOGD("reboot_protection", "Heating stopped - reboot protection cleared");
       # Turn off humidifier when heating stops
       - script.execute: update_humidifier_state
 
@@ -67,14 +75,20 @@ switch:
     on_turn_on:
       - lambda: |-
           id(cool_start_time) = millis();
+          // Track for reboot protection - persists across reboots
+          id(was_cooling_on_shutdown) = true;
           ESP_LOGI("hvac", "Compressor started - cooling mode");
+          ESP_LOGD("reboot_protection", "Cooling started - tracking for reboot protection");
       # CRITICAL: Turn off humidifier when cooling starts
       - switch.turn_off: humidifier_relay
     on_turn_off:
       - lambda: |-
           id(cool_start_time) = 0;
           id(last_compressor_stop_time) = millis();
+          // Clear reboot protection flag - cooling cycle completed normally
+          id(was_cooling_on_shutdown) = false;
           ESP_LOGI("hvac", "Compressor stopped - entering lockout period");
+          ESP_LOGD("reboot_protection", "Cooling stopped - reboot protection cleared");
 
   - platform: gpio
     pin:

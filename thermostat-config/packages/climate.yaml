@@ -45,6 +45,8 @@ climate:
     cool_overrun: ${cool_overrun} °C
 
     # Heat Action - Intelligent Dual Stage
+    # Note: Reboot/interrupted cycle protection is handled at boot time via boot_lockout
+    # and was_heating_on_shutdown tracking. No additional checks needed here.
     heat_action:
       - if:
           condition:
@@ -54,29 +56,6 @@ climate:
                 ESP_LOGW("hvac", "Heating requested but boot lockout active - waiting...");
             - wait_until:
                 lambda: 'return !id(boot_lockout);'
-      # Reboot protection: Respect minimum heating off time
-      - if:
-          condition:
-            lambda: |-
-              if (id(last_heat_off_time_persistent) == 0) return false;
-              unsigned long min_off_ms = id(min_heat_run_minutes).state * 60 * 1000;
-              unsigned long elapsed = millis() - id(last_heat_off_time_persistent);
-              return elapsed < min_off_ms;
-          then:
-            - lambda: |-
-                unsigned long min_off_ms = id(min_heat_run_minutes).state * 60 * 1000;
-                unsigned long elapsed = millis() - id(last_heat_off_time_persistent);
-                unsigned long remaining_ms = min_off_ms - elapsed;
-                ESP_LOGW("hvac", "Reboot protection: Heating off for only %.1f min, waiting %.1f min more",
-                         elapsed / 60000.0, remaining_ms / 60000.0);
-            - wait_until:
-                condition:
-                  lambda: |-
-                    unsigned long min_off_ms = id(min_heat_run_minutes).state * 60 * 1000;
-                    unsigned long elapsed = millis() - id(last_heat_off_time_persistent);
-                    return elapsed >= min_off_ms;
-            - lambda: |-
-                ESP_LOGI("hvac", "Reboot protection: Minimum heating off time elapsed");
       - if:
           condition:
             lambda: 'return id(cool_relay).state || id(fan_relay).state && id(last_hvac_mode) == 2;'
@@ -118,8 +97,9 @@ climate:
                   - delay: 30s
 
     # Cool Action
+    # Note: Reboot/interrupted cycle protection is handled at boot time via boot_lockout
+    # and was_cooling_on_shutdown tracking. No additional checks needed here.
     cool_action:
-
       - if:
           condition:
             lambda: 'return id(boot_lockout);'
@@ -128,29 +108,6 @@ climate:
                 ESP_LOGW("hvac", "Cooling requested but boot lockout active - waiting...");
             - wait_until:
                 lambda: 'return !id(boot_lockout);'
-      # Reboot protection: Respect minimum cooling off time
-      - if:
-          condition:
-            lambda: |-
-              if (id(last_cool_off_time_persistent) == 0) return false;
-              unsigned long min_off_ms = id(min_compressor_off_minutes).state * 60 * 1000;
-              unsigned long elapsed = millis() - id(last_cool_off_time_persistent);
-              return elapsed < min_off_ms;
-          then:
-            - lambda: |-
-                unsigned long min_off_ms = id(min_compressor_off_minutes).state * 60 * 1000;
-                unsigned long elapsed = millis() - id(last_cool_off_time_persistent);
-                unsigned long remaining_ms = min_off_ms - elapsed;
-                ESP_LOGW("hvac", "Reboot protection: Compressor off for only %.1f min, waiting %.1f min more",
-                         elapsed / 60000.0, remaining_ms / 60000.0);
-            - wait_until:
-                condition:
-                  lambda: |-
-                    unsigned long min_off_ms = id(min_compressor_off_minutes).state * 60 * 1000;
-                    unsigned long elapsed = millis() - id(last_cool_off_time_persistent);
-                    return elapsed >= min_off_ms;
-            - lambda: |-
-                ESP_LOGI("hvac", "Reboot protection: Minimum compressor off time elapsed");
       - if:
           condition:
             lambda: 'return id(heat_stage1_relay).state || id(fan_relay).state && id(last_hvac_mode) == 1;'
@@ -208,15 +165,9 @@ climate:
           id(heat_stage1_start_time) = 0;
           id(cool_start_time) = 0;
           id(last_compressor_stop_time) = now;
-
-          // Save off times persistently for reboot protection
-          if (id(last_hvac_mode) == 1) {
-            id(last_heat_off_time_persistent) = now;
-            ESP_LOGI("hvac", "Heating turned off - saved for reboot protection");
-          } else if (id(last_hvac_mode) == 2) {
-            id(last_cool_off_time_persistent) = now;
-            ESP_LOGI("hvac", "Cooling turned off - saved for reboot protection");
-          }
+          // Note: Reboot protection (was_heating_on_shutdown/was_cooling_on_shutdown) is
+          // handled automatically in the relay switch on_turn_on/on_turn_off handlers
+          ESP_LOGI("hvac", "HVAC cycle complete - entering idle");
       - delay: !lambda |-
           // Determine which post-run delay to use based on what was running
           int delay_seconds = 30; // Default fallback

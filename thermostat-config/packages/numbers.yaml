@@ -36,6 +36,47 @@ number:
       - lambda: |-
           ESP_LOGI("config", "Min compressor off time changed to %.0f minutes", x);
 
+# Boot lockout if HVAC cycle was interrupted by reboot
+# This prevents rapid on/off cycling if the thermostat reboots mid-cycle
+  - platform: template
+    name: "Interrupted Cycle Lockout"
+    id: interrupted_cycle_lockout_minutes
+    optimistic: true
+    restore_value: true
+    min_value: 1
+    max_value: 10
+    initial_value: 3
+    step: 1
+    unit_of_measurement: "min"
+    icon: "mdi:restart-alert"
+    web_server:
+      sorting_group_id: group_climate
+    mode: box
+    on_value:
+      - lambda: |-
+          ESP_LOGI("config", "Interrupted cycle lockout changed to %.0f minutes", x);
+
+# Temperature grace period on boot
+# How long to wait for API temperature before falling back to local sensor
+# This allows time for network/switch link-up without blocking heating indefinitely
+  - platform: template
+    name: "Boot Temp Grace Period"
+    id: boot_temp_grace_period_seconds
+    optimistic: true
+    restore_value: true
+    min_value: 10
+    max_value: 120
+    initial_value: 45
+    step: 5
+    unit_of_measurement: "s"
+    icon: "mdi:clock-start"
+    web_server:
+      sorting_group_id: group_climate
+    mode: box
+    on_value:
+      - lambda: |-
+          ESP_LOGI("config", "Boot temp grace period changed to %.0f seconds", x);
+
 # Set filter runtime hours before alerting
   - platform: template
     name: "Filter Runtime Threshold"
