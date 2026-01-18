@@ -319,13 +319,6 @@ sensor:
       then:
         - script.execute: update_humidifier_state
 
-  # WiFi Signal Strength
-  - platform: wifi_signal
-    name: "WiFi Signal"
-    web_server:
-      sorting_group_id: group_runtimes
-    update_interval: 60s
-
   # Uptime Sensor
   - platform: uptime
     name: "Uptime"

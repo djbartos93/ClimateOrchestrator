@@ -18,3 +18,11 @@ wifi:
           ESP_LOGI("network", "WiFi connection established");
 
 captive_portal:
+
+# WiFi Signal Strength - only available when using WiFi
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    web_server:
+      sorting_group_id: group_runtimes
+    update_interval: 60s
