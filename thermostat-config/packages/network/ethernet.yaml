@@ -7,8 +7,4 @@ ethernet:
   cs_pin: 42
   interrupt_pin: 2
   reset_pin: 1
-  on_connect:
-    then:
-      - rtttl.play: "wifi:d=8,o=6,b=200:g,g"
-      - lambda: |-
-          ESP_LOGI("network", "Ethernet connection established");
+  
