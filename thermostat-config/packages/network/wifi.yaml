@@ -16,3 +16,8 @@ wifi:
       - rtttl.play: "wifi:d=8,o=6,b=200:g,g"
       - lambda: |-
           ESP_LOGI("network", "WiFi connection established");
+
+# Enable Web Server for local control
+web_server:
+  port: 80
+  version: 3

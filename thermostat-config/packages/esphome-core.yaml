@@ -68,10 +68,7 @@ ota:
   - platform: esphome
     password: ${ota_pass}
 
-# Enable Web Server for local control
-web_server:
-  port: 80
-  version: 3
+
   # Load dashboard layout fix from GitHub
   js_include: layout.js
   sorting_groups:
