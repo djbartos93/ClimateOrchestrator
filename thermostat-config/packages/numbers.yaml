@@ -69,36 +69,93 @@ number:
       sorting_group_id: group_climate
     mode: box
 
-# setting the thermostat deadband (updates under/overshoot)
+# Thermostat deadband and overrun settings
+# Deadband: how far past setpoint before action STARTS
+# Overrun: how far past setpoint before action STOPS
+
   - platform: template
-    name: "Thermostat Deadband"
-    id: temp_deadband_slider
+    name: "Heat Deadband"
+    id: heat_deadband_input
     optimistic: true
     restore_value: true
     min_value: 0.1
     max_value: 2.0
-    initial_value: 0.5
+    initial_value: ${heat_deadband}
     step: 0.1
     unit_of_measurement: "°C"
+    icon: "mdi:thermometer-low"
     web_server:
       sorting_group_id: group_climate
     mode: box
     on_value:
       then:
         - lambda: |-
-            auto call = id(smart_thermostat).make_call();
-
-            // 1. Set ON thresholds (Hysteresis)
             id(smart_thermostat).set_heat_deadband(x);
-            id(smart_thermostat).set_cool_deadband(x);
-
-            // 2. Set OFF thresholds (Overshoot)
-            // This tells the thermostat to stop as soon as it is 'x' degrees past setpoint
-            id(smart_thermostat).set_heat_overrun(x);
-            id(smart_thermostat).set_cool_overrun(x);
-
             id(smart_thermostat).publish_state();
-            ESP_LOGI("config", "Hysteresis and Overshoot updated to: %.1f°C", x);
+            ESP_LOGI("config", "Heat deadband updated to: %.1f°C", x);
+
+  - platform: template
+    name: "Heat Overrun"
+    id: heat_overrun_input
+    optimistic: true
+    restore_value: true
+    min_value: 0.0
+    max_value: 2.0
+    initial_value: ${heat_overrun}
+    step: 0.1
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-high"
+    web_server:
+      sorting_group_id: group_climate
+    mode: box
+    on_value:
+      then:
+        - lambda: |-
+            id(smart_thermostat).set_heat_overrun(x);
+            id(smart_thermostat).publish_state();
+            ESP_LOGI("config", "Heat overrun updated to: %.1f°C", x);
+
+  - platform: template
+    name: "Cool Deadband"
+    id: cool_deadband_input
+    optimistic: true
+    restore_value: true
+    min_value: 0.1
+    max_value: 2.0
+    initial_value: ${cool_deadband}
+    step: 0.1
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-high"
+    web_server:
+      sorting_group_id: group_climate
+    mode: box
+    on_value:
+      then:
+        - lambda: |-
+            id(smart_thermostat).set_cool_deadband(x);
+            id(smart_thermostat).publish_state();
+            ESP_LOGI("config", "Cool deadband updated to: %.1f°C", x);
+
+  - platform: template
+    name: "Cool Overrun"
+    id: cool_overrun_input
+    optimistic: true
+    restore_value: true
+    min_value: 0.0
+    max_value: 2.0
+    initial_value: ${cool_overrun}
+    step: 0.1
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer-low"
+    web_server:
+      sorting_group_id: group_climate
+    mode: box
+    on_value:
+      then:
+        - lambda: |-
+            id(smart_thermostat).set_cool_overrun(x);
+            id(smart_thermostat).publish_state();
+            ESP_LOGI("config", "Cool overrun updated to: %.1f°C", x);
 
 # minimum heat runtime
   - platform: template

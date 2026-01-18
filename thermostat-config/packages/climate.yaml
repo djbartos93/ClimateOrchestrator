@@ -37,8 +37,12 @@ climate:
     min_fan_mode_switching_time: 10s
 
 
-    heat_deadband: ${temp_deadband} °C
-    cool_deadband: ${temp_deadband} °C
+    # Deadband: how far past setpoint before action STARTS
+    # Overrun: how far past setpoint before action STOPS
+    heat_deadband: ${heat_deadband} °C
+    heat_overrun: ${heat_overrun} °C
+    cool_deadband: ${cool_deadband} °C
+    cool_overrun: ${cool_overrun} °C
 
     # Heat Action - Intelligent Dual Stage
     heat_action:

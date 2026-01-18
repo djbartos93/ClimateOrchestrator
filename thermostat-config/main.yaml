@@ -59,7 +59,7 @@ substitutions:
 ####################################
 
 # Last build number / device
-  config_version: "0.3.6 - MBP Build"
+  config_version: "0.3.7-Stage2 - MBP Build"
 
 # Timing Constants (all in seconds)
 # sensable defaults are in place
@@ -73,7 +73,13 @@ substitutions:
 # Temperature Settings
   default_heat_setpoint: "21.0"  # 70°F
   default_cool_setpoint: "24.0"  # 75°F
-  temp_deadband: "0.5"  # Temperature deadband in °C
+
+  # Deadband: how far BELOW setpoint before heating starts / ABOVE setpoint before cooling starts
+  # Overrun: how far ABOVE setpoint before heating stops / BELOW setpoint before cooling stops
+  heat_deadband: "0.5"
+  heat_overrun: "0.5"
+  cool_deadband: "0.5"
+  cool_overrun: "0.5"
 
 
 
@@ -115,7 +121,7 @@ packages:
   network:
     url: https://github.com/djbartos93/ClimateOrchestrator
     files: [thermostat-config/packages/network/wifi.yaml]
-    ref: main
+    ref: feature/stage2-phase2-preset-urgency
     
 
   # Uncomment for ethernet instead of wifi:
@@ -129,60 +135,60 @@ packages:
   hardware:
     url: https://github.com/djbartos93/ClimateOrchestrator
     files: [thermostat-config/packages/hardware.yaml]
-    ref: main
+    ref: feature/stage2-phase2-preset-urgency
     
 
   globals:
     url: https://github.com/djbartos93/ClimateOrchestrator
     files: [thermostat-config/packages/globals.yaml]
-    ref: main
+    ref: feature/stage2-phase2-preset-urgency
     
 
   sensors:
     url: https://github.com/djbartos93/ClimateOrchestrator
     files: [thermostat-config/packages/sensors.yaml]
-    ref: main
+    ref: feature/stage2-phase2-preset-urgency
     
 
   switches:
     url: https://github.com/djbartos93/ClimateOrchestrator
     files: [thermostat-config/packages/switches.yaml]
-    ref: main
+    ref: feature/stage2-phase2-preset-urgency
     
 
   numbers:
     url: https://github.com/djbartos93/ClimateOrchestrator
     files: [thermostat-config/packages/numbers.yaml]
-    ref: main
+    ref: feature/stage2-phase2-preset-urgency
     
 
   buttons:
     url: https://github.com/djbartos93/ClimateOrchestrator
     files: [thermostat-config/packages/buttons.yaml]
-    ref: main
+    ref: feature/stage2-phase2-preset-urgency
     
 
   climate:
     url: https://github.com/djbartos93/ClimateOrchestrator
     files: [thermostat-config/packages/climate.yaml]
-    ref: main
+    ref: feature/stage2-phase2-preset-urgency
     
 
   scripts:
     url: https://github.com/djbartos93/ClimateOrchestrator
     files: [thermostat-config/packages/scripts.yaml]
-    ref: main
+    ref: feature/stage2-phase2-preset-urgency
     
 
   intervals:
     url: https://github.com/djbartos93/ClimateOrchestrator
     files: [thermostat-config/packages/intervals.yaml]
-    ref: main
+    ref: feature/stage2-phase2-preset-urgency
     
 
   esphome_core:
     url: https://github.com/djbartos93/ClimateOrchestrator
     files: [thermostat-config/packages/esphome-core.yaml]
-    ref: main
+    ref: feature/stage2-phase2-preset-urgency
     
 
