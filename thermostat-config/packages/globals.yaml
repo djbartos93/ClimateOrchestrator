@@ -10,6 +10,26 @@ globals:
     initial_value: 'false'
     restore_value: no
 
+  - id: boot_bypass_requested
+    type: bool
+    initial_value: 'false'
+    restore_value: no
+
+  - id: boot_lockout_start_ms
+    type: unsigned long
+    initial_value: '0'
+    restore_value: no
+
+  - id: boot_lockout_min_end_ms
+    type: unsigned long
+    initial_value: '0'
+    restore_value: no
+
+  - id: boot_lockout_emergency_end_ms
+    type: unsigned long
+    initial_value: '0'
+    restore_value: no
+
   - id: api_disconnect_time
     type: unsigned long
     initial_value: '0'

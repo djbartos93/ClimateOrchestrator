@@ -104,6 +104,33 @@ sensor:
       }
       return 0.0;
 
+  - platform: template
+    name: "Boot Lockout Remaining"
+    id: boot_lockout_remaining
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
+    icon: "mdi:lock-clock"
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: group_overrides
+    update_interval: 1s
+    lambda: |-
+      if (!id(boot_lockout)) return 0.0f;
+
+      unsigned long now = millis();
+
+      // Phase 1: minimum lockout window (configured + min 5 min if interrupted cycle)
+      if (id(boot_lockout_min_end_ms) > 0 && now < id(boot_lockout_min_end_ms)) {
+        return (float)(id(boot_lockout_min_end_ms) - now) / 1000.0f;
+      }
+
+      // Phase 2: waiting on API (or emergency timeout)
+      if (!id(api_ready) && id(boot_lockout_emergency_end_ms) > 0 && now < id(boot_lockout_emergency_end_ms)) {
+        return (float)(id(boot_lockout_emergency_end_ms) - now) / 1000.0f;
+      }
+
+      return 0.0f;
+
 
   # Remote Temperature Override (from Home Assistant)
   - platform: template

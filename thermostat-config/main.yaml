@@ -105,6 +105,12 @@ esphome:
           id(boot_time) = millis();
           // API readiness flag is driven by the API status sensor
           id(api_ready) = false;
+          // Reset boot bypass on every boot
+          id(boot_bypass_requested) = false;
+          // Track boot lockout timing for diagnostics
+          id(boot_lockout_start_ms) = millis();
+          // Emergency timeout start (prevents freeze if HA never comes up)
+          id(boot_lockout_emergency_end_ms) = id(boot_lockout_start_ms) + (10UL * 60UL * 1000UL);
           // Initialize remote timestamps to boot time - gives API a fair chance during grace period
           // Instead of starting at 0 (which would immediately mark them as stale)
           id(last_remote_temp_update) = millis();
@@ -126,39 +132,62 @@ esphome:
           } else {
             ESP_LOGI("boot", "No interrupted cycle detected - normal boot lockout");
           }
+
+          // Determine minimum lockout time for this boot
+          float cfg_min = id(interrupted_cycle_lockout_minutes).state;
+          float eff_min = cfg_min;
+          if (heating_interrupted || cooling_interrupted) {
+            if (eff_min < 5.0f) eff_min = 5.0f;
+          } else {
+            eff_min = 1.0f;  // Normal boot minimum lockout (60s)
+          }
+          id(boot_lockout_min_end_ms) = id(boot_lockout_start_ms) + (unsigned long)(eff_min * 60.0f * 1000.0f);
+
+          ESP_LOGW("safety", "Boot lockout minimum: %.0f minutes (min_end in %.0f sec)",
+                   eff_min,
+                   (id(boot_lockout_min_end_ms) > millis()) ? (id(boot_lockout_min_end_ms) - millis()) / 1000.0f : 0.0f);
           ESP_LOGI("boot", "Hardware initialized - entering boot lockout");
-      # Wait for interrupted cycle lockout if applicable
+      # Minimum lockout window (interruptible via boot bypass)
+      - lambda: |-
+          ESP_LOGI("safety", "Boot lockout minimum window active");
+      - wait_until:
+          timeout: !lambda |-
+            long remaining = (long)id(boot_lockout_min_end_ms) - (long)millis();
+            return (remaining > 0) ? (unsigned long)remaining : 0UL;
+          condition:
+            lambda: 'return id(boot_bypass_requested);'
       - if:
           condition:
-            lambda: 'return id(was_heating_on_shutdown) || id(was_cooling_on_shutdown);'
+            lambda: 'return id(boot_bypass_requested);'
           then:
             - lambda: |-
-                float cfg_min = id(interrupted_cycle_lockout_minutes).state;
-                float eff_min = cfg_min;
-                if (eff_min < 5.0f) eff_min = 5.0f;
-                ESP_LOGW("safety", "Interrupted cycle lockout: configured=%.0f min, effective=%.0f min (min 5)", cfg_min, eff_min);
-            - delay: !lambda |-
-                float lockout_min = id(interrupted_cycle_lockout_minutes).state;
-                if (lockout_min < 5.0f) lockout_min = 5.0f;
-                return lockout_min * 60 * 1000;
-            - lambda: |-
-                // Clear the interrupted cycle flags after lockout served
-                id(was_heating_on_shutdown) = false;
-                id(was_cooling_on_shutdown) = false;
-                ESP_LOGI("safety", "Interrupted cycle lockout complete - flags cleared");
+                ESP_LOGW("safety", "Boot lockout minimum window bypassed by operator");
           else:
-            # Normal boot - still wait 60s for safety
-            - delay: 60s
+            - lambda: |-
+                ESP_LOGI("safety", "Boot lockout minimum window complete");
+
+      - lambda: |-
+          // Clear interrupted-cycle flags once the minimum lockout has been served (or bypassed)
+          if (id(was_heating_on_shutdown) || id(was_cooling_on_shutdown)) {
+            id(was_heating_on_shutdown) = false;
+            id(was_cooling_on_shutdown) = false;
+            ESP_LOGI("safety", "Interrupted-cycle flags cleared after minimum lockout phase");
+          }
       # Wait for Home Assistant API to come online before allowing HVAC to run.
       # Emergency timeout prevents freeze if HA never comes up.
       - lambda: |-
           ESP_LOGI("safety", "Waiting for API before releasing boot_lockout (emergency timeout 10min)");
       - wait_until:
-          timeout: 10min
+          timeout: !lambda |-
+            long remaining = (long)id(boot_lockout_emergency_end_ms) - (long)millis();
+            return (remaining > 0) ? (unsigned long)remaining : 0UL;
           condition:
-            lambda: 'return id(api_ready);'
+            lambda: 'return id(api_ready) || id(boot_bypass_requested);'
       - lambda: |-
-          if (id(api_ready)) {
+          if (id(boot_bypass_requested)) {
+            id(boot_lockout) = false;
+            ESP_LOGW("safety", "Boot lockout released via operator bypass");
+          } else if (id(api_ready)) {
             id(boot_lockout) = false;
             ESP_LOGI("safety", "Boot lockout released - API connected");
           } else {
