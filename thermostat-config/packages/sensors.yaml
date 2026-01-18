@@ -478,6 +478,9 @@ binary_sensor:
     id: stage2_should_engage
     entity_id: binary_sensor.stage_2_should_engage
     internal: true
+    on_state:
+      - lambda: |-
+          ESP_LOGI("hvac", "HA stage2_should_engage updated: %s", x ? "ON" : "OFF");
 
   - platform: status
     id: api_connected_sensor

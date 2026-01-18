@@ -27,8 +27,8 @@ substitutions:
 
   # Logging Configuration
   # Available levels: NONE, ERROR, WARN, INFO, DEBUG, VERBOSE
-  log_level_default: "INFO"
-  log_level_climate: "INFO"
+  log_level_default: "DEBUG"
+  log_level_climate: "DEBUG"
   log_level_dht: "INFO"
   log_level_sensor: "INFO"
   log_level_humidifier: "INFO"
