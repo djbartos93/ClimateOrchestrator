@@ -25,6 +25,7 @@ switch:
     inverted: true
     name: "Heat Stage 1 Relay"
     internal: true
+    restore_mode: ALWAYS_OFF
     on_turn_on:
       - lambda: |-
           id(heat_stage1_start_time) = millis();
@@ -53,6 +54,7 @@ switch:
     inverted: true
     name: "Heat Stage 2 Relay"
     internal: true
+    restore_mode: ALWAYS_OFF
     on_turn_on:
       - lambda: |-
           id(heat_stage2_start_time) = millis();
@@ -72,6 +74,7 @@ switch:
     inverted: true
     name: "Cool Relay"
     internal: true
+    restore_mode: ALWAYS_OFF
     on_turn_on:
       - lambda: |-
           id(cool_start_time) = millis();

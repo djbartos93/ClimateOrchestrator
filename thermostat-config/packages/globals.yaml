@@ -5,6 +5,11 @@ globals:
     initial_value: 'true'
     restore_value: no
 
+  - id: api_ready
+    type: bool
+    initial_value: 'false'
+    restore_value: no
+
   - id: api_disconnect_time
     type: unsigned long
     initial_value: '0'

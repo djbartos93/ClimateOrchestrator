@@ -94,10 +94,17 @@ esphome:
   on_boot:
     priority: -100
     then:
+      - switch.turn_off: heat_stage1_relay
+      - switch.turn_off: heat_stage2_relay
+      - switch.turn_off: cool_relay
+      - switch.turn_off: fan_relay
+      - switch.turn_off: humidifier_relay
       - lambda: |-
           ESP_LOGI("boot", "Smart Thermostat booting...");
           // Record boot time for grace period calculations
           id(boot_time) = millis();
+          // API readiness flag is driven by the API status sensor
+          id(api_ready) = false;
           // Initialize remote timestamps to boot time - gives API a fair chance during grace period
           // Instead of starting at 0 (which would immediately mark them as stale)
           id(last_remote_temp_update) = millis();
@@ -137,11 +144,19 @@ esphome:
           else:
             # Normal boot - still wait 60s for safety
             - delay: 60s
-      # Release boot lockout via timeout if API hasn't connected yet
+      # Wait for Home Assistant API to come online before allowing HVAC to run.
+      # Emergency timeout prevents freeze if HA never comes up.
+      - wait_until:
+          timeout: 10min
+          condition:
+            lambda: 'return id(api_ready);'
       - lambda: |-
-          if (id(boot_lockout)) {
+          if (id(api_ready)) {
             id(boot_lockout) = false;
-            ESP_LOGW("safety", "Boot lockout released via timeout (API still offline)");
+            ESP_LOGI("safety", "Boot lockout released - API connected");
+          } else {
+            id(boot_lockout) = false;
+            ESP_LOGW("safety", "Boot lockout released via emergency timeout (API still offline)");
           }
       # End temperature grace period after configured time if still active
       - delay: !lambda "return id(boot_temp_grace_period_seconds).state * 1000;"

@@ -487,8 +487,8 @@ binary_sensor:
     on_press:
       then:
         - lambda: |-
-            id(boot_lockout) = false;
-            ESP_LOGI("api", "Boot lockout released - Home Assistant connected");
+            id(api_ready) = true;
+            ESP_LOGI("api", "Home Assistant connected - api_ready=true");
             id(api_disconnect_time) = 0;
             id(alarm_acknowledged) = false;
         - delay: 2s
@@ -498,6 +498,7 @@ binary_sensor:
     on_release:
       then:
         - lambda: |-
+            id(api_ready) = false;
             ESP_LOGW("api", "API connection lost");
         - script.execute: update_status_led
   - platform: status
