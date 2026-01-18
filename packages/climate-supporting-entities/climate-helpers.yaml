@@ -133,6 +133,16 @@ thermostat_helpers:
       initial: false
 
   # =============================================================================
+  # TIMERS
+  # =============================================================================
+  timer:
+    # Timer to auto-re-enable stage 2 after temporary disable
+    stage2_disable_timer:
+      name: "Stage 2 Disable Timer"
+      icon: mdi:timer-outline
+      restore: true
+
+  # =============================================================================
   # INPUT SELECT
   # =============================================================================
   input_select:
@@ -173,7 +183,40 @@ thermostat_helpers:
   # BUTTONS
   # =============================================================================
   button:
-    # Temporarily disable stage 2 heating
-    disable_stage2_temporarily:
-      name: "Disable Stage 2 Temporarily"
-      icon: mdi:numeric-2-box-outline
+    - platform: template
+      buttons:
+        # Temporarily disable stage 2 heating
+        disable_stage2_temporarily:
+          name: "Disable Stage 2 Temporarily"
+          icon: mdi:numeric-2-box-outline
+          press:
+            - service: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.stage2_temporarily_disabled
+            - service: timer.start
+              target:
+                entity_id: timer.stage2_disable_timer
+              data:
+                duration: "{{ states('input_number.stage2_disable_timeout') | int * 60 }}"
+
+  # =============================================================================
+  # AUTOMATIONS
+  # =============================================================================
+  automation:
+    # Re-enable stage 2 when the disable timer finishes
+    - id: stage2_disable_timer_finished
+      alias: "Stage 2 Disable Timer Finished"
+      description: "Re-enable stage 2 heating when the temporary disable timer expires"
+      trigger:
+        - platform: event
+          event_type: timer.finished
+          event_data:
+            entity_id: timer.stage2_disable_timer
+      action:
+        - service: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.stage2_temporarily_disabled
+        - service: notify.persistent_notification
+          data:
+            title: "Stage 2 Re-enabled"
+            message: "Stage 2 heating has been automatically re-enabled after timeout."
