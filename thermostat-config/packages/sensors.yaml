@@ -472,6 +472,33 @@ text_sensor:
 # Binary sensors for system state
 binary_sensor:
 
+  - platform: template
+    name: "Boot Lockout Active"
+    id: boot_lockout_active
+    lambda: |-
+      return id(boot_lockout);
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: group_overrides
+
+  - platform: template
+    name: "API Ready"
+    id: api_ready_sensor
+    lambda: |-
+      return id(api_ready);
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: group_overrides
+
+  - platform: template
+    name: "Interrupted Cycle Pending"
+    id: interrupted_cycle_pending
+    lambda: |-
+      return id(was_heating_on_shutdown) || id(was_cooling_on_shutdown);
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: group_overrides
+
   # Import stage 2 control logic from Home Assistant
   - platform: homeassistant
     name: "Stage 2 Should Engage"
