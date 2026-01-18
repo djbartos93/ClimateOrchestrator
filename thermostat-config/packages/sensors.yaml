@@ -476,7 +476,7 @@ binary_sensor:
   - platform: homeassistant
     name: "Stage 2 Should Engage"
     id: stage2_should_engage
-    entity_id: binary_sensor.stage2_should_engage
+    entity_id: binary_sensor.stage_2_should_engage
     internal: true
 
   - platform: status
