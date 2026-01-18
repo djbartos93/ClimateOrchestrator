@@ -10,7 +10,7 @@ substitutions:
   # GitHub Branch for Package Loading
   # Change this to test different branches without modifying package includes
   # Options: main, feature/stage2-phase2-preset-urgency, or any branch name
-  github_ref: "feature/stage2-phase2-preset-urgency"
+  github_ref: &github_ref feature/stage2-phase2-preset-urgency
 
   # Network Configuration
   # To switch between WiFi and Ethernet, comment/uncomment the appropriate section around line 105
@@ -170,39 +170,39 @@ psram:
 packages:
   # Network Configuration (choose ONE)
   - url: https://github.com/djbartos93/ClimateOrchestrator
-    ref: ${github_ref}
+    ref: *github_ref
     files: [thermostat-config/packages/network/wifi.yaml]
   # - url: https://github.com/djbartos93/ClimateOrchestrator
-  #   ref: ${github_ref}
+  #   ref: *github_ref
   #   files: [thermostat-config/packages/network/ethernet.yaml]
 
   - url: https://github.com/djbartos93/ClimateOrchestrator
-    ref: ${github_ref}
+    ref: *github_ref
     files: [thermostat-config/packages/hardware.yaml]
   - url: https://github.com/djbartos93/ClimateOrchestrator
-    ref: ${github_ref}
+    ref: *github_ref
     files: [thermostat-config/packages/globals.yaml]
   - url: https://github.com/djbartos93/ClimateOrchestrator
-    ref: ${github_ref}
+    ref: *github_ref
     files: [thermostat-config/packages/sensors.yaml]
   - url: https://github.com/djbartos93/ClimateOrchestrator
-    ref: ${github_ref}
+    ref: *github_ref
     files: [thermostat-config/packages/switches.yaml]
   - url: https://github.com/djbartos93/ClimateOrchestrator
-    ref: ${github_ref}
+    ref: *github_ref
     files: [thermostat-config/packages/numbers.yaml]
   - url: https://github.com/djbartos93/ClimateOrchestrator
-    ref: ${github_ref}
+    ref: *github_ref
     files: [thermostat-config/packages/buttons.yaml]
   - url: https://github.com/djbartos93/ClimateOrchestrator
-    ref: ${github_ref}
+    ref: *github_ref
     files: [thermostat-config/packages/climate.yaml]
   - url: https://github.com/djbartos93/ClimateOrchestrator
-    ref: ${github_ref}
+    ref: *github_ref
     files: [thermostat-config/packages/scripts.yaml]
   - url: https://github.com/djbartos93/ClimateOrchestrator
-    ref: ${github_ref}
+    ref: *github_ref
     files: [thermostat-config/packages/intervals.yaml]
   - url: https://github.com/djbartos93/ClimateOrchestrator
-    ref: ${github_ref}
+    ref: *github_ref
     files: [thermostat-config/packages/esphome-core.yaml]
