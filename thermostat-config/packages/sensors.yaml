@@ -394,12 +394,6 @@ sensor:
 
 # Text sensors for status
 text_sensor:
-  - platform: wifi_info
-    ip_address:
-      name: "IP Address"
-    ssid:
-      name: "SSID"
-
 # Dispaly ESPHome version in the dashboard
   - platform: version
     name: "ESPHome Version"

@@ -26,3 +26,11 @@ sensor:
     web_server:
       sorting_group_id: group_runtimes
     update_interval: 60s
+
+# WiFi Info - only available when using WiFi
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+    ssid:
+      name: "SSID"
