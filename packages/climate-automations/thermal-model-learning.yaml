@@ -55,7 +55,7 @@ thermal_model_learning:
                     value:
                       "{% set new_estimate = observed_heating_rate | float(1.5) %} {% set current
                       = current_stage1_rate | float(1.5) %} {% set lr = learning_rate | float(0.3) %}
-                      {% set updated = current * (1 - lr) + new_estimate * lr %} {{ [0.5, [updated,
+                      {% set updated = current * (1 - lr) + new_estimate * lr %} {{ [0.4, [updated,
                       8.0] | min] | max | round(2) }}
 
                       "
@@ -74,11 +74,11 @@ thermal_model_learning:
                       {% set estimated_stage2_add = combined_rate - stage1_only %}
 
                       {# Only learn if the estimate is reasonable (positive and not too high) #}
-                      {% if estimated_stage2_add > 0.3 and estimated_stage2_add < 5.0 %}
+                      {% if estimated_stage2_add > 0.2 and estimated_stage2_add < 6.0 %}
                         {% set current_stage2 = states('input_number.thermostat_stage2_additional_rate_' + active_preset) | float(1.8) %}
                         {% set lr = learning_rate | float(0.3) %}
                         {% set updated = current_stage2 * (1 - lr) + estimated_stage2_add * lr %}
-                        {{ [0.3, [updated, 5.0] | min] | max | round(2) }}
+                        {{ [0.2, [updated, 6.0] | min] | max | round(2) }}
                       {% else %}
                         {# Keep current value if estimate is unreasonable #}
                         {{ states('input_number.thermostat_stage2_additional_rate_' + active_preset) | float(1.8) }}
@@ -95,7 +95,7 @@ thermal_model_learning:
               = furnace_input - net_heating %}\n  {% set estimated_loss_coeff = estimated_loss
               / temp_diff_avg %}\n\n  {% set current = current_loss_coeff | float(0.5) %}\n  {%
               set lr = learning_rate | float(0.3) %}\n  {% set updated = current * (1 - lr) +
-              estimated_loss_coeff * lr %}\n  {{ [0.1, [updated, 2.0] | min] | max | round(3)
+              estimated_loss_coeff * lr %}\n  {{ [0.1, [updated, 2.5] | min] | max | round(3)
               }}\n{% else %}\n  {{ current_loss_coeff }}\n{% endif %}\n"
           action: input_number.set_value
         - target:
@@ -660,3 +660,18 @@ thermal_model_learning:
           data:
             name: "Stage 2 Control"
             message: "Large delta trigger: delay set to 1 minute (delta: {{ states('sensor.current_temperature_delta') }}°F)"
+      alias: "Stage 2 Disable Timer Finished"
+      description: "Re-enable stage 2 heating when the temporary disable timer expires"
+      trigger:
+        - platform: event
+          event_type: timer.finished
+          event_data:
+            entity_id: timer.stage2_disable_timer
+      action:
+        - service: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.stage2_temporarily_disabled
+        - service: notify.persistent_notification
+          data:
+            title: "Stage 2 Re-enabled"
+            message: "Stage 2 heating has been automatically re-enabled after timeout."

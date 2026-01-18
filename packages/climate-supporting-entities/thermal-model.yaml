@@ -34,7 +34,7 @@ thermostat_thermal_model:
     thermostat_heat_loss_coefficient_home:
       name: "Heat Loss Coeff - Home"
       min: 0.1
-      max: 2.0
+      max: 2.5
       step: 0.05
       initial: 0.5
       unit_of_measurement: "°C/hr/°C"
@@ -43,8 +43,8 @@ thermostat_thermal_model:
 
     thermostat_stage1_heating_rate_home:
       name: "Stage 1 Rate - Home"
-      min: 0.5
-      max: 5.0
+      min: 0.4
+      max: 8.0
       step: 0.1
       initial: 1.5
       unit_of_measurement: "°C/hr"
@@ -53,8 +53,8 @@ thermostat_thermal_model:
 
     thermostat_stage2_additional_rate_home:
       name: "Stage 2 Add Rate - Home"
-      min: 0.5
-      max: 5.0
+      min: 0.2
+      max: 6.0
       step: 0.1
       initial: 1.8
       unit_of_measurement: "°C/hr"
@@ -77,7 +77,7 @@ thermostat_thermal_model:
     thermostat_heat_loss_coefficient_away:
       name: "Heat Loss Coeff - Away"
       min: 0.1
-      max: 2.0
+      max: 2.5
       step: 0.05
       initial: 0.5
       unit_of_measurement: "°C/hr/°C"
@@ -86,8 +86,8 @@ thermostat_thermal_model:
 
     thermostat_stage1_heating_rate_away:
       name: "Stage 1 Rate - Away"
-      min: 0.5
-      max: 5.0
+      min: 0.4
+      max: 8.0
       step: 0.1
       initial: 1.5
       unit_of_measurement: "°C/hr"
@@ -96,8 +96,8 @@ thermostat_thermal_model:
 
     thermostat_stage2_additional_rate_away:
       name: "Stage 2 Add Rate - Away"
-      min: 0.5
-      max: 5.0
+      min: 0.2
+      max: 6.0
       step: 0.1
       initial: 1.8
       unit_of_measurement: "°C/hr"
@@ -120,7 +120,7 @@ thermostat_thermal_model:
     thermostat_heat_loss_coefficient_sleep:
       name: "Heat Loss Coeff - Sleep"
       min: 0.1
-      max: 2.0
+      max: 2.5
       step: 0.05
       initial: 0.5
       unit_of_measurement: "°C/hr/°C"
@@ -129,8 +129,8 @@ thermostat_thermal_model:
 
     thermostat_stage1_heating_rate_sleep:
       name: "Stage 1 Rate - Sleep"
-      min: 0.5
-      max: 5.0
+      min: 0.4
+      max: 8.0
       step: 0.1
       initial: 1.5
       unit_of_measurement: "°C/hr"
@@ -139,8 +139,8 @@ thermostat_thermal_model:
 
     thermostat_stage2_additional_rate_sleep:
       name: "Stage 2 Add Rate - Sleep"
-      min: 0.5
-      max: 5.0
+      min: 0.2
+      max: 6.0
       step: 0.1
       initial: 1.8
       unit_of_measurement: "°C/hr"
@@ -163,7 +163,7 @@ thermostat_thermal_model:
     thermostat_heat_loss_coefficient_boost:
       name: "Heat Loss Coeff - Boost"
       min: 0.1
-      max: 2.0
+      max: 2.5
       step: 0.05
       initial: 0.5
       unit_of_measurement: "°C/hr/°C"
@@ -172,8 +172,8 @@ thermostat_thermal_model:
 
     thermostat_stage1_heating_rate_boost:
       name: "Stage 1 Rate - Boost"
-      min: 0.5
-      max: 5.0
+      min: 0.4
+      max: 8.0
       step: 0.1
       initial: 1.5
       unit_of_measurement: "°C/hr"
@@ -182,8 +182,8 @@ thermostat_thermal_model:
 
     thermostat_stage2_additional_rate_boost:
       name: "Stage 2 Add Rate - Boost"
-      min: 0.5
-      max: 5.0
+      min: 0.2
+      max: 6.0
       step: 0.1
       initial: 1.8
       unit_of_measurement: "°C/hr"
@@ -546,11 +546,12 @@ thermostat_thermal_model:
       has_time: true
 
   input_text:
-    # Store recent heating cycle data (JSON)
+    # Store current heating cycle data (JSON)
+    # Updated by thermal_model_track_cycle_start when heating begins
     thermostat_recent_cycles:
-      name: "Recent Heating Cycles (JSON)"
+      name: "Current Heating Cycle (JSON)"
       max: 255
-      initial: "[]"
+      initial: "{}"
 
     # Store sensor configuration when each preset was last updated
     thermostat_last_sensor_config_home:

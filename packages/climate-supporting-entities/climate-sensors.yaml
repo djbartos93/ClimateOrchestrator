@@ -252,8 +252,9 @@ thermostat_stensors:
             {% endif %}
 
         # -----------------------------------------------------------------------
-        # DIAGNOSTIC: Losing Ground During Heating
-        # Detects when heating is active but temp is still dropping or flat
+        # DIAGNOSTIC: Heating Cycle Progress
+        # Tracks temperature change since heating started
+        # Uses statistics sensor to get initial temp from when heating began
         # -----------------------------------------------------------------------
         - name: "Heating Cycle Progress"
           unique_id: "b0c9d5e1-9f3c-0b0g-5d1f-9e6g0b9c0d1e"
@@ -262,11 +263,25 @@ thermostat_stensors:
           device_class: temperature
           state: >
             {% if is_state('binary_sensor.smart_thermostat_heating_active', 'on') %}
-              {% set cycle_data = states('input_text.thermostat_recent_cycles') | from_json %}
-              {% set start_temp = cycle_data.start_temp | float(70) %}
+              {# Get current temp and heating start time #}
               {% set current_temp = states('sensor.smart_thermostat_effective_temperature') | float(70) %}
-              {% set progress = current_temp - start_temp %}
-              {{ progress | round(2) }}
+              {% set heating_start = states.binary_sensor.smart_thermostat_heating_active.last_changed %}
+              {% set minutes_heating = ((now() - heating_start).total_seconds() / 60) | round(1) %}
+
+              {# Use 5min rate to estimate starting temp if heating long enough #}
+              {% set rate_5min = states('sensor.temperature_change_rate_5min') | float(0) %}
+
+              {% if minutes_heating >= 5 and rate_5min != 0 %}
+                {# Estimate start temp: current - (rate * minutes) #}
+                {% set estimated_start = current_temp - (rate_5min * minutes_heating) %}
+                {% set progress = current_temp - estimated_start %}
+                {{ progress | round(2) }}
+              {% elif minutes_heating < 5 %}
+                {# Too early to calculate meaningful progress #}
+                {{ 0 }}
+              {% else %}
+                {{ 0 }}
+              {% endif %}
             {% else %}
               0
             {% endif %}
