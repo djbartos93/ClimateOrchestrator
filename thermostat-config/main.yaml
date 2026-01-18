@@ -20,7 +20,7 @@ substitutions:
   wifi_password: !secret wifi_password
   wifi_fallback_ssid: !secret iot_wifi
   wifi_fallback_password: !secret iot_password
-  wifi_domain: !secret esp_domain
+  domain: !secret esp_domain
 
   ota_pass: !secret ota_password
   api_key: !secret api_encryption_key
