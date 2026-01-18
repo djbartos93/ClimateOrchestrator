@@ -135,7 +135,10 @@ esphome:
             - lambda: |-
                 ESP_LOGW("safety", "Interrupted cycle lockout: waiting %.0f minutes before allowing HVAC",
                          id(interrupted_cycle_lockout_minutes).state);
-            - delay: !lambda "return id(interrupted_cycle_lockout_minutes).state * 60 * 1000;"
+            - delay: !lambda |-
+                float lockout_min = id(interrupted_cycle_lockout_minutes).state;
+                if (lockout_min < 5.0f) lockout_min = 5.0f;
+                return lockout_min * 60 * 1000;
             - lambda: |-
                 // Clear the interrupted cycle flags after lockout served
                 id(was_heating_on_shutdown) = false;
