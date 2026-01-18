@@ -93,3 +93,6 @@ web_server:
     - id: group_maintenance
       name: "🛠️ Maintenance (RELAYS)"
       sorting_weight: 6
+
+mdns:
+  disabled: true

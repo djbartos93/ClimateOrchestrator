@@ -109,6 +109,12 @@ esp32:
   flash_size: 16MB
   framework:
     type: esp-idf
+    sdkconfig_options:
+      CONFIG_LWIP_MAX_SOCKETS: "16"
+      CONFIG_LWIP_SOCKET_OFFSET: "64"
+      CONFIG_LWIP_TCPIP_RECVMBOX_SIZE: "64"
+      CONFIG_LWIP_TCP_RECVMBOX_SIZE: "64"
+    
 psram:
   mode: octal
   speed: 80MHz
@@ -118,18 +124,16 @@ psram:
 # To use a specific version/tag, change ref: main to ref: v1.0.0 (or your tag name)
 packages:
   # WiFi Network Configuration (default)
-  #network:
+ # network:
  #   url: https://github.com/djbartos93/ClimateOrchestrator
-  #  files: [thermostat-config/packages/network/wifi.yaml]
-  #  ref: feature/stage2-phase2-preset-urgency
-    
+ #   files: [thermostat-config/packages/network/wifi.yaml]
+ #   ref: feature/stage2-phase2-preset-urgency
 
-   #Uncomment for ethernet instead of wifi:
+  # Uncomment for ethernet instead of wifi:
   network:
     url: https://github.com/djbartos93/ClimateOrchestrator
     files: [thermostat-config/packages/network/ethernet.yaml]
     ref: feature/stage2-phase2-preset-urgency
-  #   
 
   # Core thermostat packages
   hardware:
