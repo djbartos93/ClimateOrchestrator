@@ -25,7 +25,7 @@ thermal_model_learning:
           action: counter.increment
         - variables:
             # Use per-preset cycle count for confidence
-            cycles_analyzed: "{{ states('counter.thermostat_cycles_analyzed_' + active_preset) | int }}"
+            cycles_analyzed: "{{ states('counter.thermostat_cycles_analyzed_' + active_preset) | int(0) }}"
             stage1_entity: "input_number.thermostat_stage1_heating_rate_{{ active_preset }}"
             stage2_entity: "input_number.thermostat_stage2_additional_rate_{{ active_preset }}"
             loss_coeff_entity: "input_number.thermostat_heat_loss_coefficient_{{ active_preset }}"
