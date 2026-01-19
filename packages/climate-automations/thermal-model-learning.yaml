@@ -16,34 +16,26 @@ thermal_model_learning:
             "{{ states('sensor.smart_thermostat_effective_temperature') | float(70) >=\n
             \  state_attr('climate.smart_thermostat', 'temperature') | float(70) - 0.5 }}\n"
       actions:
+        # Increment both per-preset and global counters
+        - target:
+            entity_id: "counter.thermostat_cycles_analyzed_{{ active_preset }}"
+          action: counter.increment
         - target:
             entity_id: counter.thermostat_cycles_analyzed
           action: counter.increment
         - variables:
-            cycles_analyzed: "{{ states('counter.thermostat_cycles_analyzed') | int }}"
-            stage1_entity:
-              input_number.thermostat_stage1_heating_rate_{{ active_preset
-              }}
-            loss_coeff_entity:
-              input_number.thermostat_heat_loss_coefficient_{{ active_preset
-              }}
-            confidence_entity:
-              input_number.thermostat_model_confidence_{{ active_preset
-              }}
-            sensor_config_entity:
-              input_text.thermostat_last_sensor_config_{{ active_preset
-              }}
-            learning_rate:
-              "{{ [0.5, 0.1 + (0.4 * (100 - states('input_number.thermostat_model_confidence_'
-              + active_preset) | int) / 100)] | max }}
-
-              "
-            current_stage1_rate:
-              "{{ states('input_number.thermostat_stage1_heating_rate_'
-              + active_preset) | float(1.5) }}"
-            current_loss_coeff:
-              "{{ states('input_number.thermostat_heat_loss_coefficient_'
-              + active_preset) | float(0.5) }}"
+            # Use per-preset cycle count for confidence
+            cycles_analyzed: "{{ states('counter.thermostat_cycles_analyzed_' + active_preset) | int }}"
+            stage1_entity: "input_number.thermostat_stage1_heating_rate_{{ active_preset }}"
+            stage2_entity: "input_number.thermostat_stage2_additional_rate_{{ active_preset }}"
+            loss_coeff_entity: "input_number.thermostat_heat_loss_coefficient_{{ active_preset }}"
+            confidence_entity: "input_number.thermostat_model_confidence_{{ active_preset }}"
+            sensor_config_entity: "input_text.thermostat_last_sensor_config_{{ active_preset }}"
+            learning_rate: >
+              {{ [0.5, 0.1 + (0.4 * (100 - states('input_number.thermostat_model_confidence_' + active_preset) | int) / 100)] | max }}
+            current_stage1_rate: "{{ states('input_number.thermostat_stage1_heating_rate_' + active_preset) | float(1.5) }}"
+            current_stage2_rate: "{{ states('input_number.thermostat_stage2_additional_rate_' + active_preset) | float(1.8) }}"
+            current_loss_coeff: "{{ states('input_number.thermostat_heat_loss_coefficient_' + active_preset) | float(0.5) }}"
         - choose:
             # Case 1: Stage 2 was NOT used - learn stage 1 rate from entire cycle
             - conditions:
@@ -71,49 +63,63 @@ thermal_model_learning:
                 - condition: template
                   value_template: "{{ stage2_was_used }}"
               sequence:
-                # First, learn stage 1 rate from the first portion (before stage 2 engaged)
-                - condition: template
-                  value_template: "{{ stage1_duration | float(0) > 3 }}"
-                - target:
-                    entity_id: "{{ stage1_entity }}"
-                  data:
-                    value: >
-                      {% set new_estimate = stage1_observed_rate | float(1.5) %}
-                      {% set current = current_stage1_rate | float(1.5) %}
-                      {% set lr = learning_rate | float(0.3) %}
-                      {% set updated = current * (1 - lr) + new_estimate * lr %}
-                      {{ [0.4, [updated, 8.0] | min] | max | round(2) }}
-                  action: input_number.set_value
-                # Then, calculate and learn stage 2 additional rate
-                - condition: template
-                  value_template: "{{ stage2_duration | float(0) > 3 }}"
-                - target:
-                    entity_id: "input_number.thermostat_stage2_additional_rate_{{ active_preset }}"
-                  data:
-                    value: >
-                      {# Calculate stage 2 additional from THIS cycle's measurements #}
-                      {% set combined = combined_observed_rate | float(3.0) %}
-                      {% set stage1_this_cycle = stage1_observed_rate | float(1.5) %}
-                      {% set estimated_stage2_add = combined - stage1_this_cycle %}
+                # Learn stage 1 rate from first portion (independent - uses if/then)
+                - if:
+                    - condition: template
+                      value_template: "{{ stage1_duration | float(0) > 3 }}"
+                  then:
+                    - target:
+                        entity_id: "{{ stage1_entity }}"
+                      data:
+                        value: >
+                          {% set new_estimate = stage1_observed_rate | float(1.5) %}
+                          {% set current = current_stage1_rate | float(1.5) %}
+                          {% set lr = learning_rate | float(0.3) %}
+                          {% set updated = current * (1 - lr) + new_estimate * lr %}
+                          {{ [0.4, [updated, 8.0] | min] | max | round(2) }}
+                      action: input_number.set_value
+                    - action: logbook.log
+                      data:
+                        name: Thermal Model Learning
+                        message: >
+                          [{{ active_preset | title }}] Stage 1 portion: {{ stage1_observed_rate }}°C/hr over {{ stage1_duration }}min
 
-                      {# Only learn if the estimate is reasonable #}
-                      {% if estimated_stage2_add > 0.2 and estimated_stage2_add < 6.0 %}
-                        {% set current_stage2 = states('input_number.thermostat_stage2_additional_rate_' + active_preset) | float(1.8) %}
-                        {% set lr = learning_rate | float(0.3) %}
-                        {% set updated = current_stage2 * (1 - lr) + estimated_stage2_add * lr %}
-                        {{ [0.2, [updated, 6.0] | min] | max | round(2) }}
-                      {% else %}
-                        {# Keep current value if estimate is unreasonable #}
-                        {{ states('input_number.thermostat_stage2_additional_rate_' + active_preset) | float(1.8) }}
-                      {% endif %}
-                  action: input_number.set_value
-                - action: logbook.log
-                  data:
-                    name: Thermal Model Learning
-                    message: >
-                      [{{ active_preset | title }}] Stage 2 cycle: Stage1={{ stage1_observed_rate }}°C/hr ({{ stage1_duration }}min),
-                      Combined={{ combined_observed_rate }}°C/hr ({{ stage2_duration }}min),
-                      Stage2 add={{ (combined_observed_rate | float - stage1_observed_rate | float) | round(2) }}°C/hr
+                # Learn stage 2 rate from second portion (independent - uses if/then)
+                - if:
+                    - condition: template
+                      value_template: "{{ stage2_duration | float(0) > 3 }}"
+                  then:
+                    - target:
+                        entity_id: "{{ stage2_entity }}"
+                      data:
+                        value: >
+                          {# Calculate stage 2 additional from THIS cycle's measurements #}
+                          {% set combined = combined_observed_rate | float(3.0) %}
+                          {% set stage1_this_cycle = stage1_observed_rate | float(1.5) %}
+                          {% set estimated_stage2_add = combined - stage1_this_cycle %}
+
+                          {# Only learn if the estimate is reasonable #}
+                          {% if estimated_stage2_add > 0.2 and estimated_stage2_add < 6.0 %}
+                            {% set lr = learning_rate | float(0.3) %}
+                            {% set updated = current_stage2_rate * (1 - lr) + estimated_stage2_add * lr %}
+                            {{ [0.2, [updated, 6.0] | min] | max | round(2) }}
+                          {% else %}
+                            {# Keep current value if estimate is unreasonable #}
+                            {{ current_stage2_rate }}
+                          {% endif %}
+                      action: input_number.set_value
+                    - action: logbook.log
+                      data:
+                        name: Thermal Model Learning
+                        message: >
+                          [{{ active_preset | title }}] Stage 2 portion: combined={{ combined_observed_rate }}°C/hr over {{ stage2_duration }}min,
+                          estimated stage2 add={{ (combined_observed_rate | float - stage1_observed_rate | float) | round(2) }}°C/hr
+                  else:
+                    - action: logbook.log
+                      data:
+                        name: Thermal Model Learning
+                        message: >
+                          [{{ active_preset | title }}] Stage 2 portion too short ({{ stage2_duration }}min < 3min) - skipping stage 2 learning
         - target:
             entity_id: "{{ loss_coeff_entity }}"
           data:
