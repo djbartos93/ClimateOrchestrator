@@ -180,14 +180,12 @@ thermostat_helpers:
       restore: true
 
   # =============================================================================
-  # BUTTONS
+  # BUTTONS (using modern template syntax)
   # =============================================================================
-  button:
-    - platform: template
-      buttons:
-        # Temporarily disable stage 2 heating
-        disable_stage2_temporarily:
-          name: "Disable Stage 2 Temporarily"
+  template:
+    - button:
+        - name: "Disable Stage 2 Temporarily"
+          unique_id: "disable_stage2_temporarily"
           icon: mdi:numeric-2-box-outline
           press:
             - service: input_boolean.turn_on
