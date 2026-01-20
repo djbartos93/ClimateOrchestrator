@@ -119,10 +119,10 @@ number:
     id: heat_deadband_input
     optimistic: true
     restore_value: true
-    min_value: 0.1
+    min_value: 0.01
     max_value: 2.0
     initial_value: ${heat_deadband}
-    step: 0.1
+    step: 0.01
     unit_of_measurement: "°C"
     icon: "mdi:thermometer-low"
     web_server:
@@ -131,14 +131,14 @@ number:
     on_value:
       then:
         - lambda: |-
-            ESP_LOGW("config", "Heat deadband on_value triggered with x=%.2f", x);
+            ESP_LOGW("config", "Heat deadband on_value triggered with x=%.3f", x);
             float before = id(smart_thermostat).heat_deadband();
-            ESP_LOGW("config", "Heat deadband BEFORE set: %.2f°C", before);
+            ESP_LOGW("config", "Heat deadband BEFORE set: %.3f°C", before);
             id(smart_thermostat).set_heat_deadband(x);
             float after = id(smart_thermostat).heat_deadband();
-            ESP_LOGW("config", "Heat deadband AFTER set: %.2f°C", after);
+            ESP_LOGW("config", "Heat deadband AFTER set: %.3f°C", after);
             id(smart_thermostat).publish_state();
-            ESP_LOGI("config", "Heat deadband updated to: %.1f°C", x);
+            ESP_LOGI("config", "Heat deadband updated to: %.3f°C", x);
 
   - platform: template
     name: "Heat Overrun"
@@ -148,7 +148,7 @@ number:
     min_value: 0.0
     max_value: 2.0
     initial_value: ${heat_overrun}
-    step: 0.1
+    step: 0.01
     unit_of_measurement: "°C"
     icon: "mdi:thermometer-high"
     web_server:
@@ -157,24 +157,24 @@ number:
     on_value:
       then:
         - lambda: |-
-            ESP_LOGW("config", "Heat overrun on_value triggered with x=%.2f", x);
+            ESP_LOGW("config", "Heat overrun on_value triggered with x=%.3f", x);
             float before = id(smart_thermostat).heat_overrun();
-            ESP_LOGW("config", "Heat overrun BEFORE set: %.2f°C", before);
+            ESP_LOGW("config", "Heat overrun BEFORE set: %.3f°C", before);
             id(smart_thermostat).set_heat_overrun(x);
             float after = id(smart_thermostat).heat_overrun();
-            ESP_LOGW("config", "Heat overrun AFTER set: %.2f°C", after);
+            ESP_LOGW("config", "Heat overrun AFTER set: %.3f°C", after);
             id(smart_thermostat).publish_state();
-            ESP_LOGI("config", "Heat overrun updated to: %.1f°C", x);
+            ESP_LOGI("config", "Heat overrun updated to: %.3f°C", x);
 
   - platform: template
     name: "Cool Deadband"
     id: cool_deadband_input
     optimistic: true
     restore_value: true
-    min_value: 0.1
+    min_value: 0.01
     max_value: 2.0
     initial_value: ${cool_deadband}
-    step: 0.1
+    step: 0.01
     unit_of_measurement: "°C"
     icon: "mdi:thermometer-high"
     web_server:
@@ -183,14 +183,14 @@ number:
     on_value:
       then:
         - lambda: |-
-            ESP_LOGW("config", "Cool deadband on_value triggered with x=%.2f", x);
+            ESP_LOGW("config", "Cool deadband on_value triggered with x=%.3f", x);
             float before = id(smart_thermostat).cool_deadband();
-            ESP_LOGW("config", "Cool deadband BEFORE set: %.2f°C", before);
+            ESP_LOGW("config", "Cool deadband BEFORE set: %.3f°C", before);
             id(smart_thermostat).set_cool_deadband(x);
             float after = id(smart_thermostat).cool_deadband();
-            ESP_LOGW("config", "Cool deadband AFTER set: %.2f°C", after);
+            ESP_LOGW("config", "Cool deadband AFTER set: %.3f°C", after);
             id(smart_thermostat).publish_state();
-            ESP_LOGI("config", "Cool deadband updated to: %.1f°C", x);
+            ESP_LOGI("config", "Cool deadband updated to: %.3f°C", x);
 
   - platform: template
     name: "Cool Overrun"
@@ -200,7 +200,7 @@ number:
     min_value: 0.0
     max_value: 2.0
     initial_value: ${cool_overrun}
-    step: 0.1
+    step: 0.01
     unit_of_measurement: "°C"
     icon: "mdi:thermometer-low"
     web_server:
@@ -209,14 +209,14 @@ number:
     on_value:
       then:
         - lambda: |-
-            ESP_LOGW("config", "Cool overrun on_value triggered with x=%.2f", x);
+            ESP_LOGW("config", "Cool overrun on_value triggered with x=%.3f", x);
             float before = id(smart_thermostat).cool_overrun();
-            ESP_LOGW("config", "Cool overrun BEFORE set: %.2f°C", before);
+            ESP_LOGW("config", "Cool overrun BEFORE set: %.3f°C", before);
             id(smart_thermostat).set_cool_overrun(x);
             float after = id(smart_thermostat).cool_overrun();
-            ESP_LOGW("config", "Cool overrun AFTER set: %.2f°C", after);
+            ESP_LOGW("config", "Cool overrun AFTER set: %.3f°C", after);
             id(smart_thermostat).publish_state();
-            ESP_LOGI("config", "Cool overrun updated to: %.1f°C", x);
+            ESP_LOGI("config", "Cool overrun updated to: %.3f°C", x);
 
 # minimum heat runtime
   - platform: template
