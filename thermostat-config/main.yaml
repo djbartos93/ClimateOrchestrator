@@ -76,13 +76,13 @@ substitutions:
   max_cool_runtime: "7200"  # 2 hours
 
 # Temperature Settings
-  default_heat_setpoint: "21.0"  # 70°F
+  default_heat_setpoint: "22.22"  # 72°F
   default_cool_setpoint: "24.0"  # 75°F
 
   # Deadband: how far BELOW setpoint before heating starts / ABOVE setpoint before cooling starts
   # Overrun: how far ABOVE setpoint before heating stops / BELOW setpoint before cooling stops
-  heat_deadband: "0.5"
-  heat_overrun: "0.5"
+  heat_deadband: "0.13"
+  heat_overrun: "0.27"
   cool_deadband: "0.5"
   cool_overrun: "0.5"
 
