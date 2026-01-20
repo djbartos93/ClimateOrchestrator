@@ -636,21 +636,42 @@ binary_sensor:
   - platform: template
     name: "Heating Active"
     id: heating_active
+    icon: "mdi:fire"
+    web_server:
+      sorting_group_id: group_system_status
     lambda: 'return id(heat_stage1_relay).state || id(heat_stage2_relay).state;'
 
   - platform: template
     name: "Cooling Active"
     id: cooling_active
+    icon: "mdi:snowflake"
+    web_server:
+      sorting_group_id: group_system_status
     lambda: 'return id(cool_relay).state;'
 
   - platform: template
+    name: "Fan Active"
+    id: fan_active
+    icon: "mdi:fan"
+    web_server:
+      sorting_group_id: group_system_status
+    lambda: 'return id(fan_relay).state;'
+
+  - platform: template
     name: "Stage 2 Active"
+    id: stage2_active
+    icon: "mdi:fire-circle"
+    web_server:
+      sorting_group_id: group_system_status
     lambda: 'return id(heat_stage2_relay).state;'
 
   # Humidifier safe to run indicator
   - platform: template
     name: "Humidifier Safe to Run"
     id: humidifier_safe
+    icon: "mdi:air-humidifier"
+    web_server:
+      sorting_group_id: group_system_status
     lambda: |-
       // Humidifier can ONLY run when:
       // 1. System is in heating mode
@@ -664,20 +685,23 @@ binary_sensor:
       bool climate_heating = id(smart_thermostat).mode == CLIMATE_MODE_HEAT;
 
       return heating_running && fan_running && not_cooling && climate_heating;
-  
+
   - platform: template
     name: "HVAC Safety Interlock Active"
     id: safety_interlock_active
+    icon: "mdi:shield-lock"
     device_class: safety
     entity_category: diagnostic
+    web_server:
+      sorting_group_id: group_system_status
     lambda: |-
       // Check if we are trying to Heat while Cool is still physically active
       bool heat_waiting = (id(smart_thermostat).action == CLIMATE_ACTION_HEATING) && id(cool_relay).state;
-      
+
       // Check if we are trying to Cool while Heat is still physically active
       bool cool_waiting = (id(smart_thermostat).action == CLIMATE_ACTION_COOLING) &&
                           (id(heat_stage1_relay).state || id(heat_stage2_relay).state);  // STAGE 2: Remove "|| id(heat_stage2_relay).state" if stage 2 disabled
-      
+
       return heat_waiting || cool_waiting;
 
 

@@ -84,21 +84,24 @@ web_server:
     - id: group_climate
       name: "🌡️ Climate Control"
       sorting_weight: 1
+    - id: group_system_status
+      name: "📍 System Status"
+      sorting_weight: 2
     - id: group_temp_sensors
       name: "🔍 Temperature Details"
-      sorting_weight: 2
+      sorting_weight: 3
     - id: group_humidifier
       name: "💧 Humidity & Humidifier"
-      sorting_weight: 3
+      sorting_weight: 4
     - id: group_overrides
       name: "⚙️ System Overrides & Modes"
-      sorting_weight: 4
+      sorting_weight: 5
     - id: group_runtimes
       name: "📊 Runtimes & Health"
-      sorting_weight: 5
+      sorting_weight: 6
     - id: group_maintenance
       name: "🛠️ Maintenance (RELAYS)"
-      sorting_weight: 6
+      sorting_weight: 7
 
 mdns:
   disabled: true
