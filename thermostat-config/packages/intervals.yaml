@@ -1,4 +1,45 @@
 interval:
+  # Sync climate settings from restored number inputs on startup
+  # ESPHome doesn't trigger on_value for restored values, so we need to manually sync
+  - interval: 5s
+    then:
+      - lambda: |-
+          if (!id(climate_settings_synced)) {
+            id(climate_settings_synced) = true;
+
+            // Read current thermostat values BEFORE sync
+            ESP_LOGW("startup", "Climate settings BEFORE sync:");
+            ESP_LOGW("startup", "  Thermostat heat_deadband: %.2f°C", id(smart_thermostat).heat_deadband());
+            ESP_LOGW("startup", "  Thermostat heat_overrun: %.2f°C", id(smart_thermostat).heat_overrun());
+            ESP_LOGW("startup", "  Thermostat cool_deadband: %.2f°C", id(smart_thermostat).cool_deadband());
+            ESP_LOGW("startup", "  Thermostat cool_overrun: %.2f°C", id(smart_thermostat).cool_overrun());
+
+            // Sync deadband and overrun settings from number inputs to climate component
+            float heat_db = id(heat_deadband_input).state;
+            float heat_or = id(heat_overrun_input).state;
+            float cool_db = id(cool_deadband_input).state;
+            float cool_or = id(cool_overrun_input).state;
+
+            ESP_LOGW("startup", "Number input restored values:");
+            ESP_LOGW("startup", "  heat_deadband_input: %.2f°C", heat_db);
+            ESP_LOGW("startup", "  heat_overrun_input: %.2f°C", heat_or);
+            ESP_LOGW("startup", "  cool_deadband_input: %.2f°C", cool_db);
+            ESP_LOGW("startup", "  cool_overrun_input: %.2f°C", cool_or);
+
+            id(smart_thermostat).set_heat_deadband(heat_db);
+            id(smart_thermostat).set_heat_overrun(heat_or);
+            id(smart_thermostat).set_cool_deadband(cool_db);
+            id(smart_thermostat).set_cool_overrun(cool_or);
+            id(smart_thermostat).publish_state();
+
+            // Read current thermostat values AFTER sync
+            ESP_LOGW("startup", "Climate settings AFTER sync:");
+            ESP_LOGW("startup", "  Thermostat heat_deadband: %.2f°C", id(smart_thermostat).heat_deadband());
+            ESP_LOGW("startup", "  Thermostat heat_overrun: %.2f°C", id(smart_thermostat).heat_overrun());
+            ESP_LOGW("startup", "  Thermostat cool_deadband: %.2f°C", id(smart_thermostat).cool_deadband());
+            ESP_LOGW("startup", "  Thermostat cool_overrun: %.2f°C", id(smart_thermostat).cool_overrun());
+          }
+
   # Safety checks every 60 seconds
   # checks include: heat/cool interlock, no HUM while cooling, no HUM without fan AND heat, remote sensor health, long runtime
   - interval: 60s
