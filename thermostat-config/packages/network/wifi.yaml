@@ -5,7 +5,7 @@ wifi:
     password: ${wifi_password}
   - ssid: ${wifi_fallback_ssid}
     password: ${wifi_fallback_password}
-  domain: ${wifi_domain}
+  domain: ${domain}
   ap:
     ssid: "${friendly_name} Fallback"
     password: "thermostat"

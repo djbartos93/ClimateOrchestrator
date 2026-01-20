@@ -6,4 +6,5 @@ ethernet:
    miso_pin: GPIO14
    cs_pin: GPIO16
    interrupt_pin: GPIO12
-   reset_pin: GPIO39  
+   reset_pin: GPIO39
+   domain: ${domain}

@@ -17,13 +17,13 @@ climate:
         default_target_temperature_low: ${default_heat_setpoint} °C
         default_target_temperature_high: ${default_cool_setpoint} °C
       - name: Away
-        default_target_temperature_low: 18 °C
+        default_target_temperature_low: 17.78 °C
         default_target_temperature_high: 27 °C
       - name: Sleep
-        default_target_temperature_low: 19 °C
+        default_target_temperature_low: 20 °C
         default_target_temperature_high: 25 °C
       - name: Boost
-        default_target_temperature_low: 22 °C
+        default_target_temperature_low: 22.78 °C
         default_target_temperature_high: 23 °C
 
  
@@ -71,30 +71,58 @@ climate:
       - switch.turn_on: fan_relay
       - lambda: 'id(heat_stage1_start_time) = millis();'
       # STAGE 2: Stage 2 delay and engagement - Comment out the following lines to disable stage 2
-      # Initial delay before Stage 2 can be considered
+      # Initial delay before Stage 2 can be considered.
+      # IMPORTANT: Do not key this off id(smart_thermostat).action inside heat_action;
+      # use the physical Stage 1 relay state instead.
+      # Abort the delay early if heating ends.
+      - lambda: |-
+          ESP_LOGI("hvac", "Stage 2 delay started: %.0f min (stage1=%s, stage2=%s, ha_allow=%s)",
+                   id(stage2_delay_minutes).state,
+                   id(heat_stage1_relay).state ? "ON" : "OFF",
+                   id(heat_stage2_relay).state ? "ON" : "OFF",
+                   id(stage2_should_engage).state ? "ON" : "OFF");
       - wait_until:
           timeout: !lambda "return id(stage2_delay_minutes).state * 60 * 1000;"
-          condition: {lambda: 'return id(smart_thermostat).action == CLIMATE_ACTION_IDLE;'}
-      # Continuous loop to check if Stage 2 should engage while still heating
-      - while:
           condition:
-            lambda: 'return id(smart_thermostat).action == CLIMATE_ACTION_HEATING && !id(heat_stage2_relay).state;'
+            lambda: 'return !id(heat_stage1_relay).state;'
+      # If heating ended during the delay, do not attempt Stage 2.
+      - if:
+          condition:
+            lambda: 'return id(heat_stage1_relay).state && !id(heat_stage2_relay).state;'
           then:
-            - if:
+            - lambda: |-
+                ESP_LOGI("hvac", "Stage 2 delay elapsed; entering Stage 2 monitor loop (stage1=%s, stage2=%s, ha_allow=%s)",
+                         id(heat_stage1_relay).state ? "ON" : "OFF",
+                         id(heat_stage2_relay).state ? "ON" : "OFF",
+                         id(stage2_should_engage).state ? "ON" : "OFF");
+            # Continuous loop to check if Stage 2 should engage while Stage 1 is still running
+            - while:
                 condition:
-                  lambda: 'return id(stage2_should_engage).state;'
+                  lambda: 'return id(heat_stage1_relay).state && !id(heat_stage2_relay).state;'
                 then:
-                  - lambda: |-
-                      ESP_LOGI("hvac", "Engaging heat stage 2");
-                  - switch.turn_on: heat_stage2_relay
-            # Only delay if Stage 2 wasn't just engaged (avoid unnecessary wait)
-            - if:
-                condition:
-                  lambda: 'return !id(heat_stage2_relay).state;'
-                then:
-                  - lambda: |-
-                      ESP_LOGD("hvac", "Stage 2 inhibited by Home Assistant - will re-check in 30s");
-                  - delay: 30s
+                  - if:
+                      condition:
+                        lambda: 'return id(stage2_should_engage).state;'
+                      then:
+                        - lambda: |-
+                            ESP_LOGI("hvac", "Engaging heat stage 2");
+                        - switch.turn_on: heat_stage2_relay
+                  # Only delay if Stage 2 wasn't just engaged (avoid unnecessary wait)
+                  - if:
+                      condition:
+                        lambda: 'return !id(heat_stage2_relay).state && id(heat_stage1_relay).state;'
+                      then:
+                        - lambda: |-
+                            ESP_LOGI("hvac", "Stage 2 not engaged yet (stage1=%s, stage2=%s, ha_allow=%s) - re-checking in 30s",
+                                     id(heat_stage1_relay).state ? "ON" : "OFF",
+                                     id(heat_stage2_relay).state ? "ON" : "OFF",
+                                     id(stage2_should_engage).state ? "ON" : "OFF");
+                        - delay: 30s
+          else:
+            - lambda: |-
+                ESP_LOGI("hvac", "Stage 2 delay finished but heating is no longer active or Stage 2 already on (stage1=%s, stage2=%s)",
+                         id(heat_stage1_relay).state ? "ON" : "OFF",
+                         id(heat_stage2_relay).state ? "ON" : "OFF");
 
     # Cool Action
     # Note: Reboot/interrupted cycle protection is handled at boot time via boot_lockout

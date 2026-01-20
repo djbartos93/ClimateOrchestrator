@@ -5,6 +5,31 @@ globals:
     initial_value: 'true'
     restore_value: no
 
+  - id: api_ready
+    type: bool
+    initial_value: 'false'
+    restore_value: no
+
+  - id: boot_bypass_requested
+    type: bool
+    initial_value: 'false'
+    restore_value: no
+
+  - id: boot_lockout_start_ms
+    type: unsigned long
+    initial_value: '0'
+    restore_value: no
+
+  - id: boot_lockout_min_end_ms
+    type: unsigned long
+    initial_value: '0'
+    restore_value: no
+
+  - id: boot_lockout_emergency_end_ms
+    type: unsigned long
+    initial_value: '0'
+    restore_value: no
+
   - id: api_disconnect_time
     type: unsigned long
     initial_value: '0'
@@ -104,5 +129,11 @@ globals:
     type: int
     restore_value: no
     initial_value: '0'  # 0=none, 1=heating, 2=cooling
+
+  # Flag to track if climate settings (deadband/overrun) have been synced from number inputs
+  - id: climate_settings_synced
+    type: bool
+    restore_value: no
+    initial_value: 'false'
 
 #configure the RGB Status LED

@@ -212,6 +212,17 @@ thermostat_thermal_model:
       icon: mdi:timer-outline
       mode: slider
 
+    # Default stage 2 delay when model confidence is low
+    thermostat_default_stage2_delay:
+      name: "Default Stage 2 Delay"
+      min: 1
+      max: 15
+      step: 1
+      initial: 5
+      unit_of_measurement: "min"
+      icon: mdi:timer-cog-outline
+      mode: slider
+
     # House characteristics for better recommendations
     thermostat_house_square_feet:
       name: "House Size (Square Feet)"
@@ -326,14 +337,14 @@ thermostat_thermal_model:
           icon: "mdi:arrow-collapse-down"
           state: >
             {% set indoor = states('sensor.thermostat_average_temperature') | float(21) %}
-            {% set outdoor = states('sensor.smart_thermostat_outdoor_temperature') | float(0) %}
+            {% set outdoor = states('sensor.outdoor_temperature_celsius') | float(0) %}
             {% set preset = states('sensor.active_preset_mode') | lower %}
             {% set k = states('input_number.thermostat_heat_loss_coefficient_' + preset) | float(0.5) %}
             {% set temp_diff = indoor - outdoor %}
             {{ (k * temp_diff) | round(2) }}
           availability: >
             {{ states('sensor.thermostat_average_temperature') not in ['unknown', 'unavailable'] and
-              states('sensor.smart_thermostat_outdoor_temperature') not in ['unknown', 'unavailable'] }}
+              states('sensor.outdoor_temperature_celsius') not in ['unknown', 'unavailable'] }}
 
         # -----------------------------------------------------------------------
         # Predicted Time to Setpoint (Stage 1 Only)
@@ -344,9 +355,10 @@ thermostat_thermal_model:
           unit_of_measurement: "min"
           icon: "mdi:clock-fast"
           state: >
-            {% set current_temp = states('sensor.thermostat_average_temperature') | float(21) %}
-            {% set setpoint = state_attr('climate.smart_thermostat', 'temperature') | float(21) %}
-            {% set temp_needed = setpoint - current_temp %}
+            {% set current_temp_c = states('sensor.thermostat_average_temperature') | float(21) %}
+            {% set setpoint_f = state_attr('climate.smart_thermostat', 'temperature') | float(70) %}
+            {% set setpoint_c = ((setpoint_f - 32) * 5 / 9) %}
+            {% set temp_needed = setpoint_c - current_temp_c %}
 
             {% if temp_needed <= 0 %}
               0
@@ -372,9 +384,10 @@ thermostat_thermal_model:
           unit_of_measurement: "min"
           icon: "mdi:clock-fast"
           state: >
-            {% set current_temp = states('sensor.thermostat_average_temperature') | float(21) %}
-            {% set setpoint = state_attr('climate.smart_thermostat', 'temperature') | float(21) %}
-            {% set temp_needed = setpoint - current_temp %}
+            {% set current_temp_c = states('sensor.thermostat_average_temperature') | float(21) %}
+            {% set setpoint_f = state_attr('climate.smart_thermostat', 'temperature') | float(70) %}
+            {% set setpoint_c = ((setpoint_f - 32) * 5 / 9) %}
+            {% set temp_needed = setpoint_c - current_temp_c %}
 
             {% if temp_needed <= 0 %}
               0
@@ -402,48 +415,51 @@ thermostat_thermal_model:
           unit_of_measurement: "min"
           icon: "mdi:timer-cog"
           state: >
-            {% set target_cycle = states('input_number.thermostat_target_cycle_time') | float(25) %}
-            {% set predicted_stage1_only = states('sensor.predicted_time_to_setpoint_stage_1') | float(30) %}
-            {% set predicted_both_stages = states('sensor.predicted_time_to_setpoint_stage_1_2') | float(15) %}
+            {% set preset = states('sensor.active_preset_mode') | lower %}
+            {% set confidence = states('input_number.thermostat_model_confidence_' + preset) | int(0) %}
+            {% set default_delay = states('input_number.thermostat_default_stage2_delay') | int(5) %}
 
-            {# If stage 1 alone can hit target, use long delay (stage 2 not needed) #}
-            {% if predicted_stage1_only <= target_cycle %}
-              {% set optimal = 30 %}
-            {# If both stages can't hit target fast enough, use minimum delay #}
-            {% elif predicted_both_stages >= target_cycle %}
-              {% set optimal = 1 %}
-            {# Calculate delay to hit target cycle time #}
+            {# Use default delay if confidence is too low #}
+            {% if confidence <= 35 %}
+              {{ default_delay }}
             {% else %}
-              {# Time on stage 1 alone + time on both stages = target #}
-              {# delay + (target - delay) * rate_ratio = target #}
-              {% set preset = states('sensor.active_preset_mode') | lower %}
-              {% set stage1_rate = states('input_number.thermostat_stage1_heating_rate_' + preset) | float(1.5) %}
-              {% set stage2_add = states('input_number.thermostat_stage2_additional_rate_' + preset) | float(1.8) %}
-              {% set heat_loss = states('sensor.current_heat_loss_rate') | float(0) %}
-              {% set net_stage1 = stage1_rate - heat_loss %}
-              {% set net_both = stage1_rate + stage2_add - heat_loss %}
+              {% set target_cycle = states('input_number.thermostat_target_cycle_time') | float(25) %}
+              {% set predicted_stage1_only = states('sensor.predicted_time_to_setpoint_stage_1') | float(30) %}
+              {% set predicted_both_stages = states('sensor.predicted_time_to_setpoint_stage_1_2') | float(15) %}
 
-              {% if net_both <= net_stage1 %}
-                {% set optimal = 5 %}
+              {# If stage 1 alone can hit target, use long delay (stage 2 not needed) #}
+              {% if predicted_stage1_only <= target_cycle %}
+                {% set optimal = 30 %}
+              {# If both stages can't hit target fast enough, use minimum delay #}
+              {% elif predicted_both_stages >= target_cycle %}
+                {% set optimal = 1 %}
+              {# Calculate delay to hit target cycle time #}
               {% else %}
-                {# Use weighted average based on how much help stage 2 provides #}
-                {% set stage2_improvement = net_both / net_stage1 %}
-                {% set time_savings = predicted_stage1_only - predicted_both_stages %}
-                {% set optimal = target_cycle - predicted_both_stages %}
-                {% set optimal = [optimal, 1] | max %}
-                {% set optimal = [optimal, 20] | min %}
+                {% set stage1_rate = states('input_number.thermostat_stage1_heating_rate_' + preset) | float(1.5) %}
+                {% set stage2_add = states('input_number.thermostat_stage2_additional_rate_' + preset) | float(1.8) %}
+                {% set heat_loss = states('sensor.current_heat_loss_rate') | float(0) %}
+                {% set net_stage1 = stage1_rate - heat_loss %}
+                {% set net_both = stage1_rate + stage2_add - heat_loss %}
+
+                {% if net_both <= net_stage1 %}
+                  {% set optimal = default_delay %}
+                {% else %}
+                  {% set optimal = target_cycle - predicted_both_stages %}
+                  {% set optimal = [optimal, 1] | max %}
+                  {% set optimal = [optimal, 20] | min %}
+                {% endif %}
               {% endif %}
+
+              {# Apply preset-specific urgency factor #}
+              {% set urgency = states('sensor.stage2_active_urgency_factor') | float(1.0) %}
+              {% set adjusted = optimal * urgency %}
+
+              {# Ensure result stays within valid range (1-30 min) #}
+              {% set final = [adjusted, 1] | max %}
+              {% set final = [final, 30] | min %}
+
+              {{ final | round(0) }}
             {% endif %}
-
-            {# Apply preset-specific urgency factor #}
-            {% set urgency = states('sensor.stage2_active_urgency_factor') | float(1.0) %}
-            {% set adjusted = optimal * urgency %}
-
-            {# Ensure result stays within valid range (1-30 min) #}
-            {% set final = [adjusted, 1] | max %}
-            {% set final = [final, 30] | min %}
-
-            {{ final | round(0) }}
 
         # -----------------------------------------------------------------------
         # Heating Efficiency Score (0-100)
@@ -575,11 +591,32 @@ thermostat_thermal_model:
       initial: ""
 
   # =============================================================================
-  # COUNTERS for Learning System
+  # COUNTERS for Learning System (per-preset)
   # =============================================================================
   counter:
-    # Number of heating cycles analyzed by model
+    # Per-preset cycle counters for accurate confidence tracking
+    thermostat_cycles_analyzed_home:
+      name: "Cycles Analyzed - Home"
+      icon: mdi:counter
+      restore: true
+
+    thermostat_cycles_analyzed_away:
+      name: "Cycles Analyzed - Away"
+      icon: mdi:counter
+      restore: true
+
+    thermostat_cycles_analyzed_sleep:
+      name: "Cycles Analyzed - Sleep"
+      icon: mdi:counter
+      restore: true
+
+    thermostat_cycles_analyzed_boost:
+      name: "Cycles Analyzed - Boost"
+      icon: mdi:counter
+      restore: true
+
+    # Legacy global counter (kept for backwards compatibility)
     thermostat_cycles_analyzed:
-      name: "Cycles Analyzed by Model"
+      name: "Cycles Analyzed (Total)"
       icon: mdi:counter
       restore: true

@@ -37,4 +37,15 @@ button:
       - switch.turn_off: fan_relay
       - switch.turn_off: humidifier_relay
 
+  - platform: template
+    name: "Bypass Boot Lockout"
+    icon: "mdi:lock-open-variant"
+    web_server:
+      sorting_group_id: group_maintenance
+    on_press:
+      - lambda: |-
+          id(boot_bypass_requested) = true;
+          id(boot_lockout) = false;
+          ESP_LOGW("safety", "Operator bypass: boot lockout disabled");
+
 # Interval checks for safety, monitoring, and runtime tracking

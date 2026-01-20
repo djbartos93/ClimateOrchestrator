@@ -33,7 +33,7 @@ thermostat_stensors:
               {# Calculate average #}
               {% set avg_f = (ns.temps | sum / ns.temps | length) %}
               {# Convert Fahrenheit to Celsius: (°F - 32) × 5/9 #}
-              {{ ((avg_f - 32) * 5 / 9) | round(1) }}
+              {{ ((avg_f - 32) * 5 / 9) | round(3) }}
             {% else %}
               {# Fallback to local sensor #}
               {{ states('sensor.smart_thermostat_local_temperature') | float(21) }}
@@ -70,6 +70,18 @@ thermostat_stensors:
               {# Fallback to local sensor if no room toggles are on or sensors are offline #}
               {{ states('sensor.smart_thermostat_local_humidity') | float(50) }}
             {% endif %}
+        # -----------------------------------------------------------------------
+        # Outdoor Temperature in Celsius
+        # -----------------------------------------------------------------------
+        - name: "Outdoor Temperature Celsius"
+          unique_id: "a4b5c6d7-e8f9-a0b1-c2d3-e4f5a6b7c8d9"
+          state_class: measurement
+          device_class: temperature
+          unit_of_measurement: "°C"
+          state: >
+            {% set f = states('sensor.lansing_st_weather_temp') | float(32) %}
+            {{ ((f - 32) * 5 / 9) | round(3) }}
+
         # -----------------------------------------------------------------------
         # Humidifier Auto Setpoint (outdoor temperature based)
         # -----------------------------------------------------------------------
@@ -227,9 +239,11 @@ thermostat_stensors:
           icon: "mdi:thermometer-lines"
           device_class: temperature
           state: >
-            {% set current_temp = states('sensor.smart_thermostat_effective_temperature') | float(70) %}
-            {% set setpoint = state_attr('climate.smart_thermostat', 'temperature') | float(70) %}
-            {{ (setpoint - current_temp) | round(1) }}
+            {# The effective_temperature from ESPHome is in °C, convert to °F for UI calculation #}
+            {% set current_temp_c = states('sensor.smart_thermostat_effective_temperature') | float(21) %}
+            {% set current_temp_f = (current_temp_c * 9/5) + 32 %}
+            {% set setpoint_f = state_attr('climate.smart_thermostat', 'temperature') | float(70) %}
+            {{ (setpoint_f - current_temp_f) | round(1) }}
 
         # -----------------------------------------------------------------------
         # Stage 2 Active Urgency Factor (preset-specific multiplier)
@@ -254,7 +268,7 @@ thermostat_stensors:
         # -----------------------------------------------------------------------
         # DIAGNOSTIC: Heating Cycle Progress
         # Tracks temperature change since heating started
-        # Uses statistics sensor to get initial temp from when heating began
+        # Reads start temp from thermostat_recent_cycles (set by track_cycle_start)
         # -----------------------------------------------------------------------
         - name: "Heating Cycle Progress"
           unique_id: "b0c9d5e1-9f3c-0b0g-5d1f-9e6g0b9c0d1e"
@@ -263,24 +277,20 @@ thermostat_stensors:
           device_class: temperature
           state: >
             {% if is_state('binary_sensor.smart_thermostat_heating_active', 'on') %}
-              {# Get current temp and heating start time #}
-              {% set current_temp = states('sensor.smart_thermostat_effective_temperature') | float(70) %}
-              {% set heating_start = states.binary_sensor.smart_thermostat_heating_active.last_changed %}
-              {% set minutes_heating = ((now() - heating_start).total_seconds() / 60) | round(1) %}
+              {% set cycle_json = states('input_text.thermostat_recent_cycles') %}
+              {% set cycle_data = cycle_json | from_json if cycle_json not in ['', '{}', '[]', 'unknown', 'unavailable'] else {} %}
 
-              {# Use 5min rate to estimate starting temp if heating long enough #}
-              {% set rate_5min = states('sensor.temperature_change_rate_5min') | float(0) %}
-
-              {% if minutes_heating >= 5 and rate_5min != 0 %}
-                {# Estimate start temp: current - (rate * minutes) #}
-                {% set estimated_start = current_temp - (rate_5min * minutes_heating) %}
-                {% set progress = current_temp - estimated_start %}
+              {% if cycle_data is mapping and cycle_data.start_temp is defined %}
+                {# start_temp is stored in Celsius, effective_temperature is in Fahrenheit #}
+                {% set start_temp_c = cycle_data.start_temp | float(21) %}
+                {% set start_temp_f = (start_temp_c * 9 / 5) + 32 %}
+                {# The effective_temperature from ESPHome is in °C, convert to °F for UI calculation #}
+                {% set current_temp_c = states('sensor.smart_thermostat_effective_temperature') | float(21) %}
+                {% set current_temp_f = (current_temp_c * 9/5) + 32 %}
+                {% set progress = current_temp_f - start_temp_f %}
                 {{ progress | round(2) }}
-              {% elif minutes_heating < 5 %}
-                {# Too early to calculate meaningful progress #}
-                {{ 0 }}
               {% else %}
-                {{ 0 }}
+                0
               {% endif %}
             {% else %}
               0
@@ -308,14 +318,20 @@ thermostat_stensors:
           device_class: occupancy
 
         # -----------------------------------------------------------------------
-        # Stage 2 Near-Setpoint Inhibit (within 1.5°F of target)
+        # Stage 2 Near-Setpoint Inhibit
+        # Inhibits stage 2 when within 1.5°F of setpoint OR already past it
+        # Stage 2 only allowed when delta > 1.5 (more than 1.5°F below target)
         # -----------------------------------------------------------------------
         - name: "Stage 2 Near-Setpoint Inhibit"
           unique_id: "v4w3x9y5-3z7w-4v4a-9x5z-3y0a4v3w4x5y"
           icon: "mdi:thermometer-check"
           state: >
             {% set delta = states('sensor.current_temperature_delta') | float(5) %}
-            {{ delta <= 1.5 and delta > 0 }}
+            {# delta = setpoint - current_temp
+               delta > 0 means we're below setpoint (need to heat)
+               delta <= 0 means we're at or past setpoint
+               Inhibit stage 2 when close to or past setpoint #}
+            {{ delta <= 1.5 }}
 
         # -----------------------------------------------------------------------
         # Stage 2 Large Delta Trigger (>3°F change in last 5 minutes)

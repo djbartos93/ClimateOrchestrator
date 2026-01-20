@@ -25,7 +25,17 @@ switch:
     inverted: true
     name: "Heat Stage 1 Relay"
     internal: true
+    restore_mode: ALWAYS_OFF
     on_turn_on:
+      - if:
+          condition:
+            lambda: 'return id(boot_lockout);'
+          then:
+            - lambda: |-
+                ESP_LOGW("safety", "Blocked Heat Stage 1 ON during boot_lockout");
+            - switch.turn_off: heat_stage1_relay
+            - script.execute: update_humidifier_state
+            - lambda: 'return;'
       - lambda: |-
           id(heat_stage1_start_time) = millis();
           // Track for reboot protection - persists across reboots
@@ -36,9 +46,15 @@ switch:
     on_turn_off:
       - lambda: |-
           id(heat_stage1_start_time) = 0;
-          // Clear reboot protection flag - heating cycle completed normally
-          id(was_heating_on_shutdown) = false;
-          ESP_LOGD("reboot_protection", "Heating stopped - reboot protection cleared");
+          // Boot-time safety shutdown should NOT clear reboot-protection flags.
+          // We want on_boot to detect an interrupted cycle and apply the lockout.
+          if (id(boot_lockout)) {
+            ESP_LOGW("reboot_protection", "Heating relay off during boot_lockout - preserving interrupted-cycle flag");
+          } else {
+            // Clear reboot protection flag - heating cycle completed normally
+            id(was_heating_on_shutdown) = false;
+            ESP_LOGD("reboot_protection", "Heating stopped - reboot protection cleared");
+          }
       # Turn off humidifier when heating stops
       - script.execute: update_humidifier_state
 
@@ -53,7 +69,16 @@ switch:
     inverted: true
     name: "Heat Stage 2 Relay"
     internal: true
+    restore_mode: ALWAYS_OFF
     on_turn_on:
+      - if:
+          condition:
+            lambda: 'return id(boot_lockout);'
+          then:
+            - lambda: |-
+                ESP_LOGW("safety", "Blocked Heat Stage 2 ON during boot_lockout");
+            - switch.turn_off: heat_stage2_relay
+            - lambda: 'return;'
       - lambda: |-
           id(heat_stage2_start_time) = millis();
           ESP_LOGI("hvac", "Heat Stage 2 engaged - deep heating mode");
@@ -72,7 +97,16 @@ switch:
     inverted: true
     name: "Cool Relay"
     internal: true
+    restore_mode: ALWAYS_OFF
     on_turn_on:
+      - if:
+          condition:
+            lambda: 'return id(boot_lockout);'
+          then:
+            - lambda: |-
+                ESP_LOGW("safety", "Blocked Cooling ON during boot_lockout");
+            - switch.turn_off: cool_relay
+            - lambda: 'return;'
       - lambda: |-
           id(cool_start_time) = millis();
           // Track for reboot protection - persists across reboots
@@ -85,10 +119,16 @@ switch:
       - lambda: |-
           id(cool_start_time) = 0;
           id(last_compressor_stop_time) = millis();
-          // Clear reboot protection flag - cooling cycle completed normally
-          id(was_cooling_on_shutdown) = false;
-          ESP_LOGI("hvac", "Compressor stopped - entering lockout period");
-          ESP_LOGD("reboot_protection", "Cooling stopped - reboot protection cleared");
+          // Boot-time safety shutdown should NOT clear reboot-protection flags.
+          // We want on_boot to detect an interrupted cycle and apply the lockout.
+          if (id(boot_lockout)) {
+            ESP_LOGW("reboot_protection", "Cooling relay off during boot_lockout - preserving interrupted-cycle flag");
+          } else {
+            // Clear reboot protection flag - cooling cycle completed normally
+            id(was_cooling_on_shutdown) = false;
+            ESP_LOGI("hvac", "Compressor stopped - entering lockout period");
+            ESP_LOGD("reboot_protection", "Cooling stopped - reboot protection cleared");
+          }
 
   - platform: gpio
     pin:

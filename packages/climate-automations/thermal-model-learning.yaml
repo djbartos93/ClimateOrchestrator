@@ -12,39 +12,36 @@ thermal_model_learning:
           trigger: state
       conditions:
         - condition: template
+          value_template: >
+            {% set cycle_data = states('input_text.thermostat_recent_cycles') | from_json %}
+            {{ cycle_data is mapping and cycle_data.start_temp is defined }}
+        - condition: template
           value_template:
-            "{{ states('sensor.smart_thermostat_effective_temperature') | float(70) >=\n
+            "{{ states('sensor.smart_thermostat_effective_temperature') | float(70) >=
             \  state_attr('climate.smart_thermostat', 'temperature') | float(70) - 0.5 }}\n"
       actions:
+        # Increment both per-preset and global counters
+        - target:
+            entity_id: "counter.thermostat_cycles_analyzed_{{ active_preset }}"
+          action: counter.increment
         - target:
             entity_id: counter.thermostat_cycles_analyzed
           action: counter.increment
         - variables:
-            cycles_analyzed: "{{ states('counter.thermostat_cycles_analyzed') | int }}"
-            stage1_entity:
-              input_number.thermostat_stage1_heating_rate_{{ active_preset
-              }}
-            loss_coeff_entity:
-              input_number.thermostat_heat_loss_coefficient_{{ active_preset
-              }}
-            confidence_entity:
-              input_number.thermostat_model_confidence_{{ active_preset
-              }}
-            sensor_config_entity:
-              input_text.thermostat_last_sensor_config_{{ active_preset
-              }}
-            learning_rate:
-              "{{ [0.5, 0.1 + (0.4 * (100 - states('input_number.thermostat_model_confidence_'
-              + active_preset) | int) / 100)] | max }}
-
-              "
-            current_stage1_rate:
-              "{{ states('input_number.thermostat_stage1_heating_rate_'
-              + active_preset) | float(1.5) }}"
-            current_loss_coeff:
-              "{{ states('input_number.thermostat_heat_loss_coefficient_'
-              + active_preset) | float(0.5) }}"
+            # Use per-preset cycle count for confidence
+            cycles_analyzed: "{{ states('counter.thermostat_cycles_analyzed_' + active_preset) | int(0) }}"
+            stage1_entity: "input_number.thermostat_stage1_heating_rate_{{ active_preset }}"
+            stage2_entity: "input_number.thermostat_stage2_additional_rate_{{ active_preset }}"
+            loss_coeff_entity: "input_number.thermostat_heat_loss_coefficient_{{ active_preset }}"
+            confidence_entity: "input_number.thermostat_model_confidence_{{ active_preset }}"
+            sensor_config_entity: "input_text.thermostat_last_sensor_config_{{ active_preset }}"
+            learning_rate: >
+              {{ [0.5, 0.1 + (0.4 * (100 - states('input_number.thermostat_model_confidence_' + active_preset) | int) / 100)] | max }}
+            current_stage1_rate: "{{ states('input_number.thermostat_stage1_heating_rate_' + active_preset) | float(1.5) }}"
+            current_stage2_rate: "{{ states('input_number.thermostat_stage2_additional_rate_' + active_preset) | float(1.8) }}"
+            current_loss_coeff: "{{ states('input_number.thermostat_heat_loss_coefficient_' + active_preset) | float(0.5) }}"
         - choose:
+            # Case 1: Stage 2 was NOT used - learn stage 1 rate from entire cycle
             - conditions:
                 - condition: template
                   value_template: "{{ not stage2_was_used }}"
@@ -52,39 +49,81 @@ thermal_model_learning:
                 - target:
                     entity_id: "{{ stage1_entity }}"
                   data:
-                    value:
-                      "{% set new_estimate = observed_heating_rate | float(1.5) %} {% set current
-                      = current_stage1_rate | float(1.5) %} {% set lr = learning_rate | float(0.3) %}
-                      {% set updated = current * (1 - lr) + new_estimate * lr %} {{ [0.4, [updated,
-                      8.0] | min] | max | round(2) }}
-
-                      "
+                    value: >
+                      {% set new_estimate = stage1_observed_rate | float(1.5) %}
+                      {% set current = current_stage1_rate | float(1.5) %}
+                      {% set lr = learning_rate | float(0.3) %}
+                      {% set updated = current * (1 - lr) + new_estimate * lr %}
+                      {{ [0.4, [updated, 8.0] | min] | max | round(2) }}
                   action: input_number.set_value
+                - action: logbook.log
+                  data:
+                    name: Thermal Model Learning
+                    message: >
+                      [{{ active_preset | title }}] Stage 1 only cycle: observed {{ stage1_observed_rate }}°C/hr
+
+            # Case 2: Stage 2 WAS used - learn both rates from their respective portions
             - conditions:
                 - condition: template
                   value_template: "{{ stage2_was_used }}"
               sequence:
-                - target:
-                    entity_id: "input_number.thermostat_stage2_additional_rate_{{ active_preset }}"
-                  data:
-                    value:
-                      "{# When stage 2 was used, estimate its additional contribution #}
-                      {% set combined_rate = observed_heating_rate | float(3.0) %}
-                      {% set stage1_only = current_stage1_rate | float(1.5) %}
-                      {% set estimated_stage2_add = combined_rate - stage1_only %}
+                # Learn stage 1 rate from first portion (independent - uses if/then)
+                - if:
+                    - condition: template
+                      value_template: "{{ stage1_duration | float(0) > 3 }}"
+                  then:
+                    - target:
+                        entity_id: "{{ stage1_entity }}"
+                      data:
+                        value: >
+                          {% set new_estimate = stage1_observed_rate | float(1.5) %}
+                          {% set current = current_stage1_rate | float(1.5) %}
+                          {% set lr = learning_rate | float(0.3) %}
+                          {% set updated = current * (1 - lr) + new_estimate * lr %}
+                          {{ [0.4, [updated, 8.0] | min] | max | round(2) }}
+                      action: input_number.set_value
+                    - action: logbook.log
+                      data:
+                        name: Thermal Model Learning
+                        message: >
+                          [{{ active_preset | title }}] Stage 1 portion: {{ stage1_observed_rate }}°C/hr over {{ stage1_duration }}min
 
-                      {# Only learn if the estimate is reasonable (positive and not too high) #}
-                      {% if estimated_stage2_add > 0.2 and estimated_stage2_add < 6.0 %}
-                        {% set current_stage2 = states('input_number.thermostat_stage2_additional_rate_' + active_preset) | float(1.8) %}
-                        {% set lr = learning_rate | float(0.3) %}
-                        {% set updated = current_stage2 * (1 - lr) + estimated_stage2_add * lr %}
-                        {{ [0.2, [updated, 6.0] | min] | max | round(2) }}
-                      {% else %}
-                        {# Keep current value if estimate is unreasonable #}
-                        {{ states('input_number.thermostat_stage2_additional_rate_' + active_preset) | float(1.8) }}
-                      {% endif %}
-                      "
-                  action: input_number.set_value
+                # Learn stage 2 rate from second portion (independent - uses if/then)
+                - if:
+                    - condition: template
+                      value_template: "{{ stage2_duration | float(0) > 3 }}"
+                  then:
+                    - target:
+                        entity_id: "{{ stage2_entity }}"
+                      data:
+                        value: >
+                          {# Calculate stage 2 additional from THIS cycle's measurements #}
+                          {% set combined = combined_observed_rate | float(3.0) %}
+                          {% set stage1_this_cycle = stage1_observed_rate | float(1.5) %}
+                          {% set estimated_stage2_add = combined - stage1_this_cycle %}
+
+                          {# Only learn if the estimate is reasonable #}
+                          {% if estimated_stage2_add > 0.2 and estimated_stage2_add < 6.0 %}
+                            {% set lr = learning_rate | float(0.3) %}
+                            {% set updated = current_stage2_rate * (1 - lr) + estimated_stage2_add * lr %}
+                            {{ [0.2, [updated, 6.0] | min] | max | round(2) }}
+                          {% else %}
+                            {# Keep current value if estimate is unreasonable #}
+                            {{ current_stage2_rate }}
+                          {% endif %}
+                      action: input_number.set_value
+                    - action: logbook.log
+                      data:
+                        name: Thermal Model Learning
+                        message: >
+                          [{{ active_preset | title }}] Stage 2 portion: combined={{ combined_observed_rate }}°C/hr over {{ stage2_duration }}min,
+                          estimated stage2 add={{ (combined_observed_rate | float - stage1_observed_rate | float) | round(2) }}°C/hr
+                  else:
+                    - action: logbook.log
+                      data:
+                        name: Thermal Model Learning
+                        message: >
+                          [{{ active_preset | title }}] Stage 2 portion too short ({{ stage2_duration }}min < 3min) - skipping stage 2 learning
         - target:
             entity_id: "{{ loss_coeff_entity }}"
           data:
@@ -128,47 +167,100 @@ thermal_model_learning:
       mode: queued
       max: 5
       variables:
-        active_preset:
-          "{% set preset = state_attr('climate.smart_thermostat', 'preset_mode')
-          | lower %} {% if preset in ['home', 'away', 'sleep', 'boost'] %}\n  {{ preset
-          }}\n{% else %}\n  home\n{% endif %}\n"
-        cycle_duration:
-          "{{ ((now() - states.binary_sensor.smart_thermostat_heating_active.last_changed).total_seconds()
-          / 60) | round(1) }}
+        # Parse stored cycle data, with a fallback to an empty dict
+        cycle_data: "{{ states('input_text.thermostat_recent_cycles') | from_json or {} }}"
 
-          "
-        temp_rise:
-          "{% set cycle_data = states('input_text.thermostat_recent_cycles')
-          | from_json %} {{ (states('sensor.thermostat_average_temperature') | float(21))
-          - cycle_data.start_temp | float(21) }}
+        active_preset: >
+          {% set preset = state_attr('climate.smart_thermostat', 'preset_mode') | lower %}
+          {% if preset in ['home', 'away', 'sleep', 'boost'] %}
+            {{ preset }}
+          {% else %}
+            home
+          {% endif %}
 
-          "
-        outdoor_temp:
-          "{% set cycle_data = states('input_text.thermostat_recent_cycles')
-          | from_json %} {{ cycle_data.outdoor_temp }}
+        # Total cycle duration in minutes
+        cycle_duration: >
+          {{ ((now() - states.binary_sensor.smart_thermostat_heating_active.last_changed).total_seconds() / 60) | round(1) }}
 
-          "
-        temp_delta:
-          "{% set cycle_data = states('input_text.thermostat_recent_cycles')
-          | from_json %} {{ cycle_data.temp_delta }}
+        # End temperature (current)
+        end_temp: "{{ states('sensor.thermostat_average_temperature') | float(21) }}"
 
-          "
-        stage2_was_used:
-          "{{ states('binary_sensor.smart_thermostat_stage_2_active') ==
-          'on' or\n   states.binary_sensor.smart_thermostat_stage_2_active.last_changed
-          >\n   states.binary_sensor.smart_thermostat_heating_active.last_changed }}\n"
-        observed_heating_rate: "{{ (temp_rise / (cycle_duration / 60)) | round(2) }}
+        # Total temperature rise
+        temp_rise: >
+          {% if cycle_data and cycle_data.start_temp is defined %}
+            {{ end_temp | float(21) - cycle_data.start_temp | float(21) }}
+          {% else %}
+            0
+          {% endif %}
 
-          "
-        indoor_temp_avg:
-          "{% set cycle_data = states('input_text.thermostat_recent_cycles')
-          | from_json %} {{ (cycle_data.start_temp | float(21) + states('sensor.thermostat_average_temperature')
-          | float(21)) / 2 }}
+        outdoor_temp: "{{ cycle_data.outdoor_temp | float(0) if cycle_data else 0 }}"
+        temp_delta: "{{ cycle_data.temp_delta_c | float(1) if cycle_data else 1 }}"
 
-          "
-        temp_diff_avg: "{{ indoor_temp_avg | float(21) - outdoor_temp | float(0) }}
+        # Reliable stage 2 detection from stored data
+        stage2_was_used: "{{ cycle_data.get('stage2_used', false) }}"
 
-          "
+        # Stage 1 only calculations (when stage 2 not used, or first portion when it was)
+        stage1_duration: >
+          {% if cycle_data and cycle_data.get('stage2_used', false) and cycle_data.get('stage2_engage_time') is not none %}
+            {% set start = as_datetime(cycle_data.start_time) %}
+            {% set engage = as_datetime(cycle_data.stage2_engage_time) %}
+            {{ ((engage - start).total_seconds() / 60) | round(1) }}
+          {% else %}
+            {{ cycle_duration }}
+          {% endif %}
+
+        stage1_temp_rise: >
+          {% if cycle_data and cycle_data.get('stage2_used', false) and cycle_data.get('stage2_engage_temp') is not none %}
+            {{ cycle_data.stage2_engage_temp | float(21) - cycle_data.start_temp | float(21) }}
+          {% else %}
+            {{ temp_rise }}
+          {% endif %}
+
+        # Stage 1 heating rate (°C/hr) - from stage 1 only portion
+        stage1_observed_rate: >
+          {% set duration_hrs = stage1_duration | float(1) / 60 %}
+          {% if duration_hrs > 0.05 %}
+            {{ (stage1_temp_rise | float(0) / duration_hrs) | round(2) }}
+          {% else %}
+            {{ 1.5 }}
+          {% endif %}
+
+        # Combined rate calculations (when stage 2 was used)
+        stage2_duration: >
+          {% if cycle_data and cycle_data.get('stage2_used', false) and cycle_data.get('stage2_engage_time') is not none %}
+            {% set engage = as_datetime(cycle_data.stage2_engage_time) %}
+            {% set end_time = now() %}
+            {{ ((end_time - engage).total_seconds() / 60) | round(1) }}
+          {% else %}
+            0
+          {% endif %}
+
+        stage2_temp_rise: >
+          {% if cycle_data and cycle_data.get('stage2_used', false) and cycle_data.get('stage2_engage_temp') is not none %}
+            {{ end_temp | float(21) - cycle_data.stage2_engage_temp | float(21) }}
+          {% else %}
+            0
+          {% endif %}
+
+        # Combined heating rate (stage1 + stage2) in °C/hr
+        combined_observed_rate: >
+          {% set duration_hrs = stage2_duration | float(0) / 60 %}
+          {% if duration_hrs > 0.05 %}
+            {{ (stage2_temp_rise | float(0) / duration_hrs) | round(2) }}
+          {% else %}
+            {{ 3.0 }}
+          {% endif %}
+
+        # Overall observed rate (for backwards compatibility)
+        observed_heating_rate: "{{ (temp_rise | float(0) / (cycle_duration | float(1) / 60)) | round(2) }}"
+
+        indoor_temp_avg: >
+          {% if cycle_data and cycle_data.start_temp is defined %}
+            {{ (cycle_data.start_temp | float(21) + end_temp | float(21)) / 2 }}
+          {% else %}
+            {{ end_temp | float(21) }}
+          {% endif %}
+        temp_diff_avg: "{{ indoor_temp_avg | float(21) - outdoor_temp | float(0) }}"
     - id: thermal_model_sensor_config_changed
       alias: "Thermal Model: Sensor Config Changed"
       description: Reduce confidence when user changes which sensors are being averaged
@@ -272,7 +364,7 @@ thermal_model_learning:
         - data:
             name: Thermal Model Learning
             message: >
-              Cycle started: {{ cycle_data.temp_delta | round(1) }}°C to go, outdoor
+              Cycle started: {{ cycle_data.temp_delta_c | round(1) }}°C to go, outdoor
               {{ cycle_data.outdoor_temp | round(1) }}°C
           action: logbook.log
       mode: restart
@@ -280,37 +372,74 @@ thermal_model_learning:
         cycle_data:
           start_time: "{{ now().isoformat() }}"
           start_temp: "{{ states('sensor.thermostat_average_temperature') | float(21) }}"
-          outdoor_temp: "{{ states('sensor.smart_thermostat_outdoor_temperature') | float(0) }}"
-          setpoint: "{{ state_attr('climate.smart_thermostat', 'temperature') | float(21) }}"
-          temp_delta: "{{ (state_attr('climate.smart_thermostat', 'temperature') | float(21)) - (states('sensor.thermostat_average_temperature') | float(21)) }}"
+          outdoor_temp: "{{ states('sensor.outdoor_temperature_celsius') | float(0) }}"
+          setpoint_c: "{{ ((state_attr('climate.smart_thermostat', 'temperature') | float(70) - 32) * 5 / 9) | round(2) }}"
+          temp_delta_c: "{{ (((state_attr('climate.smart_thermostat', 'temperature') | float(70) - 32) * 5 / 9) - (states('sensor.thermostat_average_temperature') | float(21))) | round(2) }}"
           stage2_delay_used: "{{ states('number.smart_thermostat_stage_2_delay') | int(5) }}"
+          stage2_used: false
+          stage2_engage_time: null
+          stage2_engage_temp: null
+
+    - id: thermal_model_track_stage2_engage
+      alias: "Thermal Model: Track Stage 2 Engagement"
+      description: Record temperature and time when stage 2 engages
+      triggers:
+        - entity_id: binary_sensor.smart_thermostat_stage_2_active
+          to: "on"
+          trigger: state
+      conditions:
+        - condition: state
+          entity_id: binary_sensor.smart_thermostat_heating_active
+          state: "on"
+      actions:
+        - variables:
+            existing_data: "{{ states('input_text.thermostat_recent_cycles') | from_json }}"
+            updated_data:
+              start_time: "{{ existing_data.start_time }}"
+              start_temp: "{{ existing_data.start_temp }}"
+              outdoor_temp: "{{ existing_data.outdoor_temp }}"
+              setpoint_c: "{{ existing_data.setpoint_c }}"
+              temp_delta_c: "{{ existing_data.temp_delta_c }}"
+              stage2_delay_used: "{{ existing_data.stage2_delay_used }}"
+              stage2_used: true
+              stage2_engage_time: "{{ now().isoformat() }}"
+              stage2_engage_temp: "{{ states('sensor.thermostat_average_temperature') | float(21) }}"
+        - target:
+            entity_id: input_text.thermostat_recent_cycles
+          data:
+            value: "{{ updated_data | to_json }}"
+          action: input_text.set_value
+        - data:
+            name: Thermal Model Learning
+            message: >
+              Stage 2 engaged at {{ states('sensor.thermostat_average_temperature') }}°C
+              (started at {{ existing_data.start_temp }}°C)
+          action: logbook.log
+      mode: single
 
     - id: thermal_model_apply_optimal_delay
       alias: "Thermal Model: Apply Optimal Delay"
-      description: "Set stage 2 delay using thermal model predictions"
+      description: "Set stage 2 delay using thermal model predictions (only when idle)"
       mode: restart
 
       trigger:
-        # When heating starts
+        # When heating stops (good time to update for next cycle)
         - platform: state
           entity_id: binary_sensor.smart_thermostat_heating_active
-          to: "on"
-          id: heating_started
+          to: "off"
+          for:
+            seconds: 10
+          id: heating_stopped
 
-        # Periodic updates
-        - platform: time_pattern
-          minutes: "/15"
-          id: periodic_update
-
-        # When preset mode changes (instant adaptation)
+        # When preset mode changes (instant adaptation, but only if not heating)
         - platform: state
           entity_id: sensor.active_preset_mode
           id: preset_changed
 
-        # When outdoor temperature changes significantly
-        - platform: state
-          entity_id: sensor.smart_thermostat_outdoor_temperature
-          id: conditions_changed
+        # Periodic updates (for when conditions change gradually)
+        - platform: time_pattern
+          hours: "/1"
+          id: periodic_update
 
       variables:
         # Get active preset
@@ -322,14 +451,25 @@ thermal_model_learning:
             home
           {% endif %}
 
-        optimal_delay: "{{ states('sensor.optimal_stage_2_delay') | int(5) }}"
-        current_delay: "{{ states('number.smart_thermostat_stage_2_delay') | int(5) }}"
         confidence: "{{ states('input_number.thermostat_model_confidence_' + active_preset) | int(0) }}"
+        current_delay: "{{ states('number.smart_thermostat_stage_2_delay') | int(5) }}"
+
+        # Use learned optimal delay if confident, otherwise default to 5 min
+        target_delay: >
+          {% if confidence > 35 %}
+            {{ states('sensor.optimal_stage_2_delay') | int(5) }}
+          {% else %}
+            5
+          {% endif %}
 
       condition:
-        # Only apply if active preset's model is somewhat confident
-        - condition: template
-          value_template: "{{ confidence > 35 }}"
+        # Never change delay while actively heating or cooling
+        - condition: state
+          entity_id: binary_sensor.smart_thermostat_heating_active
+          state: "off"
+        - condition: state
+          entity_id: binary_sensor.smart_thermostat_cooling_active
+          state: "off"
 
         # Only during heating season (below 15°C / 59°F)
         - condition: template
@@ -341,24 +481,27 @@ thermal_model_learning:
             {{ outdoor_temp_c < 15 }}
 
       action:
-        # Only update if significantly different (avoid tiny adjustments)
+        # Only update if different (avoid unnecessary updates)
         - condition: template
-          value_template: "{{ (optimal_delay - current_delay) | abs > 1 }}"
+          value_template: "{{ target_delay != current_delay }}"
 
-        # Apply the optimal delay
+        # Apply the delay
         - service: number.set_value
           target:
             entity_id: number.smart_thermostat_stage_2_delay
           data:
-            value: "{{ optimal_delay }}"
+            value: "{{ target_delay }}"
 
         # Log the change with preset info
         - service: logbook.log
           data:
             name: "Thermal Model"
             message: >
-              [{{ active_preset | title }}] Updated stage 2 delay: {{ current_delay }}min → {{ optimal_delay }}min
-              (confidence: {{ confidence }}%)
+              {% if confidence > 35 %}
+                [{{ active_preset | title }}] Updated stage 2 delay: {{ current_delay }}min → {{ target_delay }}min (confidence: {{ confidence }}%)
+              {% else %}
+                [{{ active_preset | title }}] Using default stage 2 delay: {{ target_delay }}min (confidence {{ confidence }}% too low)
+              {% endif %}
 
     - id: thermal_model_ai_review
       alias: "Thermal Model: Safety Reset"
@@ -660,8 +803,11 @@ thermal_model_learning:
           data:
             name: "Stage 2 Control"
             message: "Large delta trigger: delay set to 1 minute (delta: {{ states('sensor.current_temperature_delta') }}°F)"
-      alias: "Stage 2 Disable Timer Finished"
+
+    - id: stage2_disable_timer_finished
+      alias: "Stage 2: Disable Timer Finished"
       description: "Re-enable stage 2 heating when the temporary disable timer expires"
+      mode: single
       trigger:
         - platform: event
           event_type: timer.finished
@@ -671,7 +817,11 @@ thermal_model_learning:
         - service: input_boolean.turn_off
           target:
             entity_id: input_boolean.stage2_temporarily_disabled
-        - service: notify.persistent_notification
+        - service: notify.notify
           data:
-            title: "Stage 2 Re-enabled"
+            title: "✅ Stage 2 Re-Enabled"
             message: "Stage 2 heating has been automatically re-enabled after timeout."
+        - service: logbook.log
+          data:
+            name: "Stage 2 Control"
+            message: "Stage 2 automatically re-enabled after timer expired"

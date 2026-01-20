@@ -9,7 +9,7 @@ sensor:
     temperature:
       name: "Local Temperature"
       id: local_temperature
-      accuracy_decimals: 1
+      accuracy_decimals: 3
       web_server:
         sorting_group_id: group_temp_sensors
       filters:
@@ -104,12 +104,39 @@ sensor:
       }
       return 0.0;
 
+  - platform: template
+    name: "Boot Lockout Remaining"
+    id: boot_lockout_remaining
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
+    icon: "mdi:lock-clock"
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: group_overrides
+    update_interval: 1s
+    lambda: |-
+      if (!id(boot_lockout)) return 0.0f;
+
+      unsigned long now = millis();
+
+      // Phase 1: minimum lockout window (configured + min 5 min if interrupted cycle)
+      if (id(boot_lockout_min_end_ms) > 0 && now < id(boot_lockout_min_end_ms)) {
+        return (float)(id(boot_lockout_min_end_ms) - now) / 1000.0f;
+      }
+
+      // Phase 2: waiting on API (or emergency timeout)
+      if (!id(api_ready) && id(boot_lockout_emergency_end_ms) > 0 && now < id(boot_lockout_emergency_end_ms)) {
+        return (float)(id(boot_lockout_emergency_end_ms) - now) / 1000.0f;
+      }
+
+      return 0.0f;
+
 
   # Remote Temperature Override (from Home Assistant)
   - platform: template
     name: "Remote Temperature"
     id: remote_temperature_override
-    accuracy_decimals: 1
+    accuracy_decimals: 3
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
@@ -144,7 +171,7 @@ sensor:
   - platform: template
     name: "Ecobee Temperature"
     id: ecobee_temperature_sensor
-    accuracy_decimals: 1
+    accuracy_decimals: 3
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
@@ -156,7 +183,7 @@ sensor:
   - platform: template
     name: "Effective Temperature"
     id: effective_temperature
-    accuracy_decimals: 1
+    accuracy_decimals: 3
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
@@ -217,7 +244,7 @@ sensor:
   - platform: template
     name: "Feels Like Temperature"
     id: feels_like_temperature
-    accuracy_decimals: 1
+    accuracy_decimals: 3
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
@@ -270,7 +297,7 @@ sensor:
   - platform: template
     name: "Compensated Temperature"
     id: compensated_temperature
-    accuracy_decimals: 1
+    accuracy_decimals: 3
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
@@ -381,7 +408,9 @@ sensor:
     entity_id: ${outdoor_temp_entity}
     web_server:
       sorting_group_id: group_temp_sensors
-    internal: false
+    internal: true # Make it internal, we'll expose a filtered version
+    filters:
+      - lambda: 'return (x - 32.0) * 5.0 / 9.0;'
 
   # Outdoor humidity (from Home Assistant weather integration)
   - platform: homeassistant
@@ -472,20 +501,50 @@ text_sensor:
 # Binary sensors for system state
 binary_sensor:
 
+  - platform: template
+    name: "Boot Lockout Active"
+    id: boot_lockout_active
+    lambda: |-
+      return id(boot_lockout);
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: group_overrides
+
+  - platform: template
+    name: "API Ready"
+    id: api_ready_sensor
+    lambda: |-
+      return id(api_ready);
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: group_overrides
+
+  - platform: template
+    name: "Interrupted Cycle Pending"
+    id: interrupted_cycle_pending
+    lambda: |-
+      return id(was_heating_on_shutdown) || id(was_cooling_on_shutdown);
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: group_overrides
+
   # Import stage 2 control logic from Home Assistant
   - platform: homeassistant
     name: "Stage 2 Should Engage"
     id: stage2_should_engage
-    entity_id: binary_sensor.stage2_should_engage
+    entity_id: binary_sensor.stage_2_should_engage
     internal: true
+    on_state:
+      - lambda: |-
+          ESP_LOGI("hvac", "HA stage2_should_engage updated: %s", x ? "ON" : "OFF");
 
   - platform: status
     id: api_connected_sensor
     on_press:
       then:
         - lambda: |-
-            id(boot_lockout) = false;
-            ESP_LOGI("api", "Boot lockout released - Home Assistant connected");
+            id(api_ready) = true;
+            ESP_LOGI("api", "Home Assistant connected - api_ready=true");
             id(api_disconnect_time) = 0;
             id(alarm_acknowledged) = false;
         - delay: 2s
@@ -495,6 +554,7 @@ binary_sensor:
     on_release:
       then:
         - lambda: |-
+            id(api_ready) = false;
             ESP_LOGW("api", "API connection lost");
         - script.execute: update_status_led
   - platform: status
@@ -578,21 +638,42 @@ binary_sensor:
   - platform: template
     name: "Heating Active"
     id: heating_active
+    icon: "mdi:fire"
+    web_server:
+      sorting_group_id: group_system_status
     lambda: 'return id(heat_stage1_relay).state || id(heat_stage2_relay).state;'
 
   - platform: template
     name: "Cooling Active"
     id: cooling_active
+    icon: "mdi:snowflake"
+    web_server:
+      sorting_group_id: group_system_status
     lambda: 'return id(cool_relay).state;'
 
   - platform: template
+    name: "Fan Active"
+    id: fan_active
+    icon: "mdi:fan"
+    web_server:
+      sorting_group_id: group_system_status
+    lambda: 'return id(fan_relay).state;'
+
+  - platform: template
     name: "Stage 2 Active"
+    id: stage2_active
+    icon: "mdi:fire-circle"
+    web_server:
+      sorting_group_id: group_system_status
     lambda: 'return id(heat_stage2_relay).state;'
 
   # Humidifier safe to run indicator
   - platform: template
     name: "Humidifier Safe to Run"
     id: humidifier_safe
+    icon: "mdi:air-humidifier"
+    web_server:
+      sorting_group_id: group_system_status
     lambda: |-
       // Humidifier can ONLY run when:
       // 1. System is in heating mode
@@ -606,20 +687,23 @@ binary_sensor:
       bool climate_heating = id(smart_thermostat).mode == CLIMATE_MODE_HEAT;
 
       return heating_running && fan_running && not_cooling && climate_heating;
-  
+
   - platform: template
     name: "HVAC Safety Interlock Active"
     id: safety_interlock_active
+    icon: "mdi:shield-lock"
     device_class: safety
     entity_category: diagnostic
+    web_server:
+      sorting_group_id: group_system_status
     lambda: |-
       // Check if we are trying to Heat while Cool is still physically active
       bool heat_waiting = (id(smart_thermostat).action == CLIMATE_ACTION_HEATING) && id(cool_relay).state;
-      
+
       // Check if we are trying to Cool while Heat is still physically active
       bool cool_waiting = (id(smart_thermostat).action == CLIMATE_ACTION_COOLING) &&
                           (id(heat_stage1_relay).state || id(heat_stage2_relay).state);  // STAGE 2: Remove "|| id(heat_stage2_relay).state" if stage 2 disabled
-      
+
       return heat_waiting || cool_waiting;
 
 
