@@ -33,7 +33,7 @@ thermostat_stensors:
               {# Calculate average #}
               {% set avg_f = (ns.temps | sum / ns.temps | length) %}
               {# Convert Fahrenheit to Celsius: (°F - 32) × 5/9 #}
-              {{ ((avg_f - 32) * 5 / 9) | round(1) }}
+              {{ ((avg_f - 32) * 5 / 9) | round(3) }}
             {% else %}
               {# Fallback to local sensor #}
               {{ states('sensor.smart_thermostat_local_temperature') | float(21) }}
@@ -70,6 +70,18 @@ thermostat_stensors:
               {# Fallback to local sensor if no room toggles are on or sensors are offline #}
               {{ states('sensor.smart_thermostat_local_humidity') | float(50) }}
             {% endif %}
+        # -----------------------------------------------------------------------
+        # Outdoor Temperature in Celsius
+        # -----------------------------------------------------------------------
+        - name: "Outdoor Temperature Celsius"
+          unique_id: "a4b5c6d7-e8f9-a0b1-c2d3-e4f5a6b7c8d9"
+          state_class: measurement
+          device_class: temperature
+          unit_of_measurement: "°C"
+          state: >
+            {% set f = states('sensor.lansing_st_weather_temp') | float(32) %}
+            {{ ((f - 32) * 5 / 9) | round(3) }}
+
         # -----------------------------------------------------------------------
         # Humidifier Auto Setpoint (outdoor temperature based)
         # -----------------------------------------------------------------------
@@ -227,9 +239,11 @@ thermostat_stensors:
           icon: "mdi:thermometer-lines"
           device_class: temperature
           state: >
-            {% set current_temp = states('sensor.smart_thermostat_effective_temperature') | float(70) %}
-            {% set setpoint = state_attr('climate.smart_thermostat', 'temperature') | float(70) %}
-            {{ (setpoint - current_temp) | round(1) }}
+            {# The effective_temperature from ESPHome is in °C, convert to °F for UI calculation #}
+            {% set current_temp_c = states('sensor.smart_thermostat_effective_temperature') | float(21) %}
+            {% set current_temp_f = (current_temp_c * 9/5) + 32 %}
+            {% set setpoint_f = state_attr('climate.smart_thermostat', 'temperature') | float(70) %}
+            {{ (setpoint_f - current_temp_f) | round(1) }}
 
         # -----------------------------------------------------------------------
         # Stage 2 Active Urgency Factor (preset-specific multiplier)
@@ -270,8 +284,10 @@ thermostat_stensors:
                 {# start_temp is stored in Celsius, effective_temperature is in Fahrenheit #}
                 {% set start_temp_c = cycle_data.start_temp | float(21) %}
                 {% set start_temp_f = (start_temp_c * 9 / 5) + 32 %}
-                {% set current_temp = states('sensor.smart_thermostat_effective_temperature') | float(70) %}
-                {% set progress = current_temp - start_temp_f %}
+                {# The effective_temperature from ESPHome is in °C, convert to °F for UI calculation #}
+                {% set current_temp_c = states('sensor.smart_thermostat_effective_temperature') | float(21) %}
+                {% set current_temp_f = (current_temp_c * 9/5) + 32 %}
+                {% set progress = current_temp_f - start_temp_f %}
                 {{ progress | round(2) }}
               {% else %}
                 0

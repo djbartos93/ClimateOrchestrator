@@ -337,14 +337,14 @@ thermostat_thermal_model:
           icon: "mdi:arrow-collapse-down"
           state: >
             {% set indoor = states('sensor.thermostat_average_temperature') | float(21) %}
-            {% set outdoor = states('sensor.smart_thermostat_outdoor_temperature') | float(0) %}
+            {% set outdoor = states('sensor.outdoor_temperature_celsius') | float(0) %}
             {% set preset = states('sensor.active_preset_mode') | lower %}
             {% set k = states('input_number.thermostat_heat_loss_coefficient_' + preset) | float(0.5) %}
             {% set temp_diff = indoor - outdoor %}
             {{ (k * temp_diff) | round(2) }}
           availability: >
             {{ states('sensor.thermostat_average_temperature') not in ['unknown', 'unavailable'] and
-              states('sensor.smart_thermostat_outdoor_temperature') not in ['unknown', 'unavailable'] }}
+              states('sensor.outdoor_temperature_celsius') not in ['unknown', 'unavailable'] }}
 
         # -----------------------------------------------------------------------
         # Predicted Time to Setpoint (Stage 1 Only)
@@ -355,9 +355,10 @@ thermostat_thermal_model:
           unit_of_measurement: "min"
           icon: "mdi:clock-fast"
           state: >
-            {% set current_temp = states('sensor.thermostat_average_temperature') | float(21) %}
-            {% set setpoint = state_attr('climate.smart_thermostat', 'temperature') | float(21) %}
-            {% set temp_needed = setpoint - current_temp %}
+            {% set current_temp_c = states('sensor.thermostat_average_temperature') | float(21) %}
+            {% set setpoint_f = state_attr('climate.smart_thermostat', 'temperature') | float(70) %}
+            {% set setpoint_c = ((setpoint_f - 32) * 5 / 9) %}
+            {% set temp_needed = setpoint_c - current_temp_c %}
 
             {% if temp_needed <= 0 %}
               0
@@ -383,9 +384,10 @@ thermostat_thermal_model:
           unit_of_measurement: "min"
           icon: "mdi:clock-fast"
           state: >
-            {% set current_temp = states('sensor.thermostat_average_temperature') | float(21) %}
-            {% set setpoint = state_attr('climate.smart_thermostat', 'temperature') | float(21) %}
-            {% set temp_needed = setpoint - current_temp %}
+            {% set current_temp_c = states('sensor.thermostat_average_temperature') | float(21) %}
+            {% set setpoint_f = state_attr('climate.smart_thermostat', 'temperature') | float(70) %}
+            {% set setpoint_c = ((setpoint_f - 32) * 5 / 9) %}
+            {% set temp_needed = setpoint_c - current_temp_c %}
 
             {% if temp_needed <= 0 %}
               0

@@ -12,8 +12,12 @@ thermal_model_learning:
           trigger: state
       conditions:
         - condition: template
+          value_template: >
+            {% set cycle_data = states('input_text.thermostat_recent_cycles') | from_json %}
+            {{ cycle_data is mapping and cycle_data.start_temp is defined }}
+        - condition: template
           value_template:
-            "{{ states('sensor.smart_thermostat_effective_temperature') | float(70) >=\n
+            "{{ states('sensor.smart_thermostat_effective_temperature') | float(70) >=
             \  state_attr('climate.smart_thermostat', 'temperature') | float(70) - 0.5 }}\n"
       actions:
         # Increment both per-preset and global counters
@@ -163,8 +167,8 @@ thermal_model_learning:
       mode: queued
       max: 5
       variables:
-        # Parse stored cycle data
-        cycle_data: "{{ states('input_text.thermostat_recent_cycles') | from_json }}"
+        # Parse stored cycle data, with a fallback to an empty dict
+        cycle_data: "{{ states('input_text.thermostat_recent_cycles') | from_json or {} }}"
 
         active_preset: >
           {% set preset = state_attr('climate.smart_thermostat', 'preset_mode') | lower %}
@@ -182,17 +186,22 @@ thermal_model_learning:
         end_temp: "{{ states('sensor.thermostat_average_temperature') | float(21) }}"
 
         # Total temperature rise
-        temp_rise: "{{ end_temp | float(21) - cycle_data.start_temp | float(21) }}"
+        temp_rise: >
+          {% if cycle_data and cycle_data.start_temp is defined %}
+            {{ end_temp | float(21) - cycle_data.start_temp | float(21) }}
+          {% else %}
+            0
+          {% endif %}
 
-        outdoor_temp: "{{ cycle_data.outdoor_temp | float(0) }}"
-        temp_delta: "{{ cycle_data.temp_delta | float(1) }}"
+        outdoor_temp: "{{ cycle_data.outdoor_temp | float(0) if cycle_data else 0 }}"
+        temp_delta: "{{ cycle_data.temp_delta_c | float(1) if cycle_data else 1 }}"
 
         # Reliable stage 2 detection from stored data
-        stage2_was_used: "{{ cycle_data.stage2_used | default(false) }}"
+        stage2_was_used: "{{ cycle_data.get('stage2_used', false) }}"
 
         # Stage 1 only calculations (when stage 2 not used, or first portion when it was)
         stage1_duration: >
-          {% if cycle_data.stage2_used | default(false) and cycle_data.stage2_engage_time is not none %}
+          {% if cycle_data and cycle_data.get('stage2_used', false) and cycle_data.get('stage2_engage_time') is not none %}
             {% set start = as_datetime(cycle_data.start_time) %}
             {% set engage = as_datetime(cycle_data.stage2_engage_time) %}
             {{ ((engage - start).total_seconds() / 60) | round(1) }}
@@ -201,7 +210,7 @@ thermal_model_learning:
           {% endif %}
 
         stage1_temp_rise: >
-          {% if cycle_data.stage2_used | default(false) and cycle_data.stage2_engage_temp is not none %}
+          {% if cycle_data and cycle_data.get('stage2_used', false) and cycle_data.get('stage2_engage_temp') is not none %}
             {{ cycle_data.stage2_engage_temp | float(21) - cycle_data.start_temp | float(21) }}
           {% else %}
             {{ temp_rise }}
@@ -218,7 +227,7 @@ thermal_model_learning:
 
         # Combined rate calculations (when stage 2 was used)
         stage2_duration: >
-          {% if cycle_data.stage2_used | default(false) and cycle_data.stage2_engage_time is not none %}
+          {% if cycle_data and cycle_data.get('stage2_used', false) and cycle_data.get('stage2_engage_time') is not none %}
             {% set engage = as_datetime(cycle_data.stage2_engage_time) %}
             {% set end_time = now() %}
             {{ ((end_time - engage).total_seconds() / 60) | round(1) }}
@@ -227,7 +236,7 @@ thermal_model_learning:
           {% endif %}
 
         stage2_temp_rise: >
-          {% if cycle_data.stage2_used | default(false) and cycle_data.stage2_engage_temp is not none %}
+          {% if cycle_data and cycle_data.get('stage2_used', false) and cycle_data.get('stage2_engage_temp') is not none %}
             {{ end_temp | float(21) - cycle_data.stage2_engage_temp | float(21) }}
           {% else %}
             0
@@ -245,7 +254,12 @@ thermal_model_learning:
         # Overall observed rate (for backwards compatibility)
         observed_heating_rate: "{{ (temp_rise | float(0) / (cycle_duration | float(1) / 60)) | round(2) }}"
 
-        indoor_temp_avg: "{{ (cycle_data.start_temp | float(21) + end_temp | float(21)) / 2 }}"
+        indoor_temp_avg: >
+          {% if cycle_data and cycle_data.start_temp is defined %}
+            {{ (cycle_data.start_temp | float(21) + end_temp | float(21)) / 2 }}
+          {% else %}
+            {{ end_temp | float(21) }}
+          {% endif %}
         temp_diff_avg: "{{ indoor_temp_avg | float(21) - outdoor_temp | float(0) }}"
     - id: thermal_model_sensor_config_changed
       alias: "Thermal Model: Sensor Config Changed"
@@ -350,7 +364,7 @@ thermal_model_learning:
         - data:
             name: Thermal Model Learning
             message: >
-              Cycle started: {{ cycle_data.temp_delta | round(1) }}°C to go, outdoor
+              Cycle started: {{ cycle_data.temp_delta_c | round(1) }}°C to go, outdoor
               {{ cycle_data.outdoor_temp | round(1) }}°C
           action: logbook.log
       mode: restart
@@ -358,9 +372,9 @@ thermal_model_learning:
         cycle_data:
           start_time: "{{ now().isoformat() }}"
           start_temp: "{{ states('sensor.thermostat_average_temperature') | float(21) }}"
-          outdoor_temp: "{{ states('sensor.smart_thermostat_outdoor_temperature') | float(0) }}"
-          setpoint: "{{ state_attr('climate.smart_thermostat', 'temperature') | float(21) }}"
-          temp_delta: "{{ (state_attr('climate.smart_thermostat', 'temperature') | float(21)) - (states('sensor.thermostat_average_temperature') | float(21)) }}"
+          outdoor_temp: "{{ states('sensor.outdoor_temperature_celsius') | float(0) }}"
+          setpoint_c: "{{ ((state_attr('climate.smart_thermostat', 'temperature') | float(70) - 32) * 5 / 9) | round(2) }}"
+          temp_delta_c: "{{ (((state_attr('climate.smart_thermostat', 'temperature') | float(70) - 32) * 5 / 9) - (states('sensor.thermostat_average_temperature') | float(21))) | round(2) }}"
           stage2_delay_used: "{{ states('number.smart_thermostat_stage_2_delay') | int(5) }}"
           stage2_used: false
           stage2_engage_time: null
@@ -384,8 +398,8 @@ thermal_model_learning:
               start_time: "{{ existing_data.start_time }}"
               start_temp: "{{ existing_data.start_temp }}"
               outdoor_temp: "{{ existing_data.outdoor_temp }}"
-              setpoint: "{{ existing_data.setpoint }}"
-              temp_delta: "{{ existing_data.temp_delta }}"
+              setpoint_c: "{{ existing_data.setpoint_c }}"
+              temp_delta_c: "{{ existing_data.temp_delta_c }}"
               stage2_delay_used: "{{ existing_data.stage2_delay_used }}"
               stage2_used: true
               stage2_engage_time: "{{ now().isoformat() }}"
