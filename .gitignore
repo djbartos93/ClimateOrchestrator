@@ -5,3 +5,5 @@ thermostat-config/.esphome/
 thermostat-config/secrets.yaml
 thermostat-config/.DS_Store
 .DS_Store
+THERMAL_MODEL_FIXES.md
+THERMAL_MODEL.md
