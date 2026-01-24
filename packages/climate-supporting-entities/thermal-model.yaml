@@ -34,8 +34,8 @@ thermostat_thermal_model:
     thermostat_heat_loss_coefficient_home:
       name: "Heat Loss Coeff - Home"
       min: 0.1
-      max: 2.5
-      step: 0.05
+      max: 3.5
+      step: 0.001
       initial: 0.5
       unit_of_measurement: "°C/hr/°C"
       icon: mdi:home-export-outline
@@ -45,7 +45,7 @@ thermostat_thermal_model:
       name: "Stage 1 Rate - Home"
       min: 0.4
       max: 8.0
-      step: 0.1
+      step: 0.001
       initial: 1.5
       unit_of_measurement: "°C/hr"
       icon: mdi:fire
@@ -55,7 +55,7 @@ thermostat_thermal_model:
       name: "Stage 2 Add Rate - Home"
       min: 0.2
       max: 6.0
-      step: 0.1
+      step: 0.001
       initial: 1.8
       unit_of_measurement: "°C/hr"
       icon: mdi:fire-circle
@@ -77,8 +77,8 @@ thermostat_thermal_model:
     thermostat_heat_loss_coefficient_away:
       name: "Heat Loss Coeff - Away"
       min: 0.1
-      max: 2.5
-      step: 0.05
+      max: 3.5
+      step: 0.001
       initial: 0.5
       unit_of_measurement: "°C/hr/°C"
       icon: mdi:home-export-outline
@@ -88,7 +88,7 @@ thermostat_thermal_model:
       name: "Stage 1 Rate - Away"
       min: 0.4
       max: 8.0
-      step: 0.1
+      step: 0.001
       initial: 1.5
       unit_of_measurement: "°C/hr"
       icon: mdi:fire
@@ -98,7 +98,7 @@ thermostat_thermal_model:
       name: "Stage 2 Add Rate - Away"
       min: 0.2
       max: 6.0
-      step: 0.1
+      step: 0.001
       initial: 1.8
       unit_of_measurement: "°C/hr"
       icon: mdi:fire-circle
@@ -120,8 +120,8 @@ thermostat_thermal_model:
     thermostat_heat_loss_coefficient_sleep:
       name: "Heat Loss Coeff - Sleep"
       min: 0.1
-      max: 2.5
-      step: 0.05
+      max: 3.5
+      step: 0.001
       initial: 0.5
       unit_of_measurement: "°C/hr/°C"
       icon: mdi:home-export-outline
@@ -131,7 +131,7 @@ thermostat_thermal_model:
       name: "Stage 1 Rate - Sleep"
       min: 0.4
       max: 8.0
-      step: 0.1
+      step: 0.001
       initial: 1.5
       unit_of_measurement: "°C/hr"
       icon: mdi:fire
@@ -141,7 +141,7 @@ thermostat_thermal_model:
       name: "Stage 2 Add Rate - Sleep"
       min: 0.2
       max: 6.0
-      step: 0.1
+      step: 0.001
       initial: 1.8
       unit_of_measurement: "°C/hr"
       icon: mdi:fire-circle
@@ -163,8 +163,8 @@ thermostat_thermal_model:
     thermostat_heat_loss_coefficient_boost:
       name: "Heat Loss Coeff - Boost"
       min: 0.1
-      max: 2.5
-      step: 0.05
+      max: 3.5
+      step: 0.001
       initial: 0.5
       unit_of_measurement: "°C/hr/°C"
       icon: mdi:home-export-outline
@@ -174,7 +174,7 @@ thermostat_thermal_model:
       name: "Stage 1 Rate - Boost"
       min: 0.4
       max: 8.0
-      step: 0.1
+      step: 0.001
       initial: 1.5
       unit_of_measurement: "°C/hr"
       icon: mdi:fire
@@ -184,7 +184,7 @@ thermostat_thermal_model:
       name: "Stage 2 Add Rate - Boost"
       min: 0.2
       max: 6.0
-      step: 0.1
+      step: 0.001
       initial: 1.8
       unit_of_measurement: "°C/hr"
       icon: mdi:fire-circle
@@ -356,8 +356,7 @@ thermostat_thermal_model:
           icon: "mdi:clock-fast"
           state: >
             {% set current_temp_c = states('sensor.thermostat_average_temperature') | float(21) %}
-            {% set setpoint_f = state_attr('climate.smart_thermostat', 'temperature') | float(70) %}
-            {% set setpoint_c = ((setpoint_f - 32) * 5 / 9) %}
+            {% set setpoint_c = state_attr('climate.smart_thermostat', 'temperature') | float(22.2) %}
             {% set temp_needed = setpoint_c - current_temp_c %}
 
             {% if temp_needed <= 0 %}
@@ -385,8 +384,7 @@ thermostat_thermal_model:
           icon: "mdi:clock-fast"
           state: >
             {% set current_temp_c = states('sensor.thermostat_average_temperature') | float(21) %}
-            {% set setpoint_f = state_attr('climate.smart_thermostat', 'temperature') | float(70) %}
-            {% set setpoint_c = ((setpoint_f - 32) * 5 / 9) %}
+            {% set setpoint_c = state_attr('climate.smart_thermostat', 'temperature') | float(22.2) %}
             {% set temp_needed = setpoint_c - current_temp_c %}
 
             {% if temp_needed <= 0 %}

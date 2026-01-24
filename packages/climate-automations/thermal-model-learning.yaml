@@ -1,4 +1,52 @@
 thermal_model_learning:
+  script:
+    thermal_model_reset_preset:
+      alias: "Thermal Model: Reset Preset"
+      description: "Resets all learned values for a specified preset to defaults and resets the cycle counter."
+      mode: single
+      fields:
+        preset:
+          description: "The preset to reset (e.g., 'home', 'away', 'sleep', 'boost')."
+          example: "home"
+      sequence:
+        - variables:
+            preset_name: "{{ preset | lower }}"
+
+        - service: logbook.log
+          data:
+            name: Thermal Model Reset
+            message: "Resetting thermal model for '{{ preset_name }}' preset."
+
+        # Reset learned parameters to defaults
+        - service: input_number.set_value
+          target:
+            entity_id: "input_number.thermostat_stage1_heating_rate_{{ preset_name }}"
+          data:
+            value: "{{ states('input_number.thermostat_stage1_heating_rate_default') | float(1.5) }}"
+
+        - service: input_number.set_value
+          target:
+            entity_id: "input_number.thermostat_stage2_additional_rate_{{ preset_name }}"
+          data:
+            value: "{{ states('input_number.thermostat_stage2_additional_rate_default') | float(1.0) }}"
+
+        - service: input_number.set_value
+          target:
+            entity_id: "input_number.thermostat_heat_loss_coefficient_{{ preset_name }}"
+          data:
+            value: "{{ states('input_number.thermostat_heat_loss_coefficient_default') | float(0.5) }}"
+
+        # Reset confidence to initial value
+        - service: input_number.set_value
+          target:
+            entity_id: "input_number.thermostat_model_confidence_{{ preset_name }}"
+          data:
+            value: 20
+
+        # Reset the cycle counter for this preset
+        - service: counter.reset
+          target:
+            entity_id: "counter.thermostat_cycles_analyzed_{{ preset_name }}"
   automation:
     - id: thermal_model_learn_from_cycle
       alias: "Thermal Model: Learn from Cycle"
@@ -16,9 +64,15 @@ thermal_model_learning:
             {% set cycle_data = states('input_text.thermostat_recent_cycles') | from_json %}
             {{ cycle_data is mapping and cycle_data.start_temp is defined }}
         - condition: template
-          value_template:
-            "{{ states('sensor.smart_thermostat_effective_temperature') | float(70) >=
-            \  state_attr('climate.smart_thermostat', 'temperature') | float(70) - 0.5 }}\n"
+          value_template: >
+            {#
+              This condition ensures we only learn from successful heating cycles.
+              It verifies that the final temperature is at or very near the target setpoint
+              when the heating cycle ends. Both sensors provide values in Fahrenheit.
+            #}
+            {% set current_f = states('sensor.smart_thermostat_effective_temperature') | float(70) %}
+            {% set setpoint_f = state_attr('climate.smart_thermostat', 'temperature') | float(70) %}
+            {{ current_f >= (setpoint_f - 0.5) }}
       actions:
         # Increment both per-preset and global counters
         - target:
@@ -124,19 +178,33 @@ thermal_model_learning:
                         name: Thermal Model Learning
                         message: >
                           [{{ active_preset | title }}] Stage 2 portion too short ({{ stage2_duration }}min < 3min) - skipping stage 2 learning
-        - target:
-            entity_id: "{{ loss_coeff_entity }}"
-          data:
-            value:
-              "{% if temp_diff_avg | float(0) > 5 %}\n  {# Calculate heat loss from observed
-              performance #}\n  {% set furnace_input = observed_heating_rate | float(1.5) %}\n
-              \ {% set net_heating = temp_rise / (cycle_duration / 60) %}\n  {% set estimated_loss
-              = furnace_input - net_heating %}\n  {% set estimated_loss_coeff = estimated_loss
-              / temp_diff_avg %}\n\n  {% set current = current_loss_coeff | float(0.5) %}\n  {%
-              set lr = learning_rate | float(0.3) %}\n  {% set updated = current * (1 - lr) +
-              estimated_loss_coeff * lr %}\n  {{ [0.1, [updated, 2.5] | min] | max | round(3)
-              }}\n{% else %}\n  {{ current_loss_coeff }}\n{% endif %}\n"
-          action: input_number.set_value
+        - if:
+            - condition: template
+              value_template: >
+                {# Only learn heat loss if there's a significant temperature difference #}
+                {{ temp_diff_avg | float(0) > 5 }}
+          then:
+            - service: input_number.set_value
+              target:
+                entity_id: "{{ loss_coeff_entity }}"
+              data:
+                value: >
+                  {# Calculate heat loss from observed performance #}
+                  {% set furnace_input = observed_heating_rate | float(1.5) %}
+                  {% set net_heating = temp_rise / (cycle_duration / 60) %}
+                  {% set estimated_loss = furnace_input - net_heating %}
+                  {% set estimated_loss_coeff = estimated_loss / temp_diff_avg %}
+
+                  {% set current = current_loss_coeff | float(0.5) %}
+                  {% set lr = learning_rate | float(0.3) %}
+                  {% set updated = current * (1 - lr) + estimated_loss_coeff * lr %}
+                  {{ [0.1, [updated, 2.5] | min] | max | round(3) }}
+          else:
+            - service: logbook.log
+              data:
+                name: Thermal Model Learning
+                message: >
+                  [{{ active_preset | title }}] Skipping heat loss learning: temp difference too small ({{ temp_diff_avg | round(1) }}°C < 5°C)
         - target:
             entity_id: "{{ confidence_entity }}"
           data:
@@ -167,41 +235,44 @@ thermal_model_learning:
       mode: queued
       max: 5
       variables:
-        # Parse stored cycle data, with a fallback to an empty dict
+        # ===================================================================
+        # VARIABLE DEFINITIONS FOR LEARNING CALCULATION
+        # All temperatures are in Celsius, all durations are in minutes.
+        # ===================================================================
+
+        # Parse stored cycle data from the input_text helper.
+        # Fallback to an empty dictionary to prevent errors if unavailable.
         cycle_data: "{{ states('input_text.thermostat_recent_cycles') | from_json or {} }}"
 
+        # Determine the active preset mode, defaulting to 'home'.
         active_preset: >
           {% set preset = state_attr('climate.smart_thermostat', 'preset_mode') | lower %}
-          {% if preset in ['home', 'away', 'sleep', 'boost'] %}
-            {{ preset }}
-          {% else %}
-            home
-          {% endif %}
+          {{ preset if preset in ['home', 'away', 'sleep', 'boost'] else 'home' }}
 
-        # Total cycle duration in minutes
+        # Total duration of the heating cycle in minutes.
         cycle_duration: >
           {{ ((now() - states.binary_sensor.smart_thermostat_heating_active.last_changed).total_seconds() / 60) | round(1) }}
 
-        # End temperature (current)
+        # Temperature when the cycle ended (current average temperature).
         end_temp: "{{ states('sensor.thermostat_average_temperature') | float(21) }}"
 
-        # Total temperature rise
+        # Total temperature rise during the cycle (end_temp - start_temp).
         temp_rise: >
-          {% if cycle_data and cycle_data.start_temp is defined %}
-            {{ end_temp | float(21) - cycle_data.start_temp | float(21) }}
-          {% else %}
-            0
-          {% endif %}
+          {{ (end_temp - cycle_data.get('start_temp', end_temp)) | float }}
 
-        outdoor_temp: "{{ cycle_data.outdoor_temp | float(0) if cycle_data else 0 }}"
-        temp_delta: "{{ cycle_data.temp_delta_c | float(1) if cycle_data else 1 }}"
+        # Outdoor temperature recorded at the start of the cycle.
+        outdoor_temp: "{{ cycle_data.get('outdoor_temp', 0) | float }}"
 
-        # Reliable stage 2 detection from stored data
+        # Temperature delta to reach the setpoint, recorded at cycle start.
+        temp_delta: "{{ cycle_data.get('temp_delta_c', 1) | float }}"
+
+        # Boolean indicating if stage 2 was used during the cycle.
         stage2_was_used: "{{ cycle_data.get('stage2_used', false) }}"
 
-        # Stage 1 only calculations (when stage 2 not used, or first portion when it was)
+        # Duration of the Stage 1 portion of the cycle in minutes.
+        # If stage 2 was not used, this is the full cycle duration.
         stage1_duration: >
-          {% if cycle_data and cycle_data.get('stage2_used', false) and cycle_data.get('stage2_engage_time') is not none %}
+          {% if stage2_was_used and cycle_data.get('stage2_engage_time') %}
             {% set start = as_datetime(cycle_data.start_time) %}
             {% set engage = as_datetime(cycle_data.stage2_engage_time) %}
             {{ ((engage - start).total_seconds() / 60) | round(1) }}
@@ -209,58 +280,52 @@ thermal_model_learning:
             {{ cycle_duration }}
           {% endif %}
 
+        # Temperature rise during the Stage 1 portion of the cycle.
         stage1_temp_rise: >
-          {% if cycle_data and cycle_data.get('stage2_used', false) and cycle_data.get('stage2_engage_temp') is not none %}
-            {{ cycle_data.stage2_engage_temp | float(21) - cycle_data.start_temp | float(21) }}
+          {% if stage2_was_used and cycle_data.get('stage2_engage_temp') %}
+            {{ cycle_data.stage2_engage_temp | float - cycle_data.start_temp | float }}
           {% else %}
             {{ temp_rise }}
           {% endif %}
 
-        # Stage 1 heating rate (°C/hr) - from stage 1 only portion
+        # Observed heating rate for Stage 1 in °C/hr.
         stage1_observed_rate: >
           {% set duration_hrs = stage1_duration | float(1) / 60 %}
-          {% if duration_hrs > 0.05 %}
-            {{ (stage1_temp_rise | float(0) / duration_hrs) | round(2) }}
-          {% else %}
-            {{ 1.5 }}
-          {% endif %}
+          {{ (stage1_temp_rise / duration_hrs) | round(2) if duration_hrs > 0.05 else 1.5 }}
 
-        # Combined rate calculations (when stage 2 was used)
+        # Duration of the Stage 2 portion of the cycle in minutes.
         stage2_duration: >
-          {% if cycle_data and cycle_data.get('stage2_used', false) and cycle_data.get('stage2_engage_time') is not none %}
+          {% if stage2_was_used and cycle_data.get('stage2_engage_time') %}
             {% set engage = as_datetime(cycle_data.stage2_engage_time) %}
-            {% set end_time = now() %}
-            {{ ((end_time - engage).total_seconds() / 60) | round(1) }}
+            {{ ((now() - engage).total_seconds() / 60) | round(1) }}
           {% else %}
             0
           {% endif %}
 
+        # Temperature rise during the Stage 2 portion of the cycle.
         stage2_temp_rise: >
-          {% if cycle_data and cycle_data.get('stage2_used', false) and cycle_data.get('stage2_engage_temp') is not none %}
-            {{ end_temp | float(21) - cycle_data.stage2_engage_temp | float(21) }}
+          {% if stage2_was_used and cycle_data.get('stage2_engage_temp') %}
+            {{ end_temp - cycle_data.stage2_engage_temp | float }}
           {% else %}
             0
           {% endif %}
 
-        # Combined heating rate (stage1 + stage2) in °C/hr
+        # Observed combined heating rate (Stage 1 + 2) in °C/hr.
         combined_observed_rate: >
           {% set duration_hrs = stage2_duration | float(0) / 60 %}
-          {% if duration_hrs > 0.05 %}
-            {{ (stage2_temp_rise | float(0) / duration_hrs) | round(2) }}
-          {% else %}
-            {{ 3.0 }}
-          {% endif %}
+          {{ (stage2_temp_rise / duration_hrs) | round(2) if duration_hrs > 0.05 else 3.0 }}
 
-        # Overall observed rate (for backwards compatibility)
-        observed_heating_rate: "{{ (temp_rise | float(0) / (cycle_duration | float(1) / 60)) | round(2) }}"
+        # Overall observed heating rate for the entire cycle (used for heat loss).
+        observed_heating_rate: >
+          {% set duration_hrs = cycle_duration | float(1) / 60 %}
+          {{ (temp_rise / duration_hrs) | round(2) if duration_hrs > 0.05 else 1.5 }}
 
+        # Average indoor temperature during the cycle.
         indoor_temp_avg: >
-          {% if cycle_data and cycle_data.start_temp is defined %}
-            {{ (cycle_data.start_temp | float(21) + end_temp | float(21)) / 2 }}
-          {% else %}
-            {{ end_temp | float(21) }}
-          {% endif %}
-        temp_diff_avg: "{{ indoor_temp_avg | float(21) - outdoor_temp | float(0) }}"
+          {{ (cycle_data.get('start_temp', end_temp) | float + end_temp) / 2 }}
+
+        # Average difference between indoor and outdoor temperature.
+        temp_diff_avg: "{{ (indoor_temp_avg - outdoor_temp) | round(2) }}"
     - id: thermal_model_sensor_config_changed
       alias: "Thermal Model: Sensor Config Changed"
       description: Reduce confidence when user changes which sensors are being averaged
@@ -355,26 +420,26 @@ thermal_model_learning:
         - entity_id: binary_sensor.smart_thermostat_heating_active
           to: "on"
           trigger: state
-      actions:
-        - target:
+      action:
+        - service: input_text.set_value
+          target:
             entity_id: input_text.thermostat_recent_cycles
           data:
             value: "{{ cycle_data | to_json }}"
-          action: input_text.set_value
-        - data:
+        - service: logbook.log
+          data:
             name: Thermal Model Learning
             message: >
               Cycle started: {{ cycle_data.temp_delta_c | round(1) }}°C to go, outdoor
               {{ cycle_data.outdoor_temp | round(1) }}°C
-          action: logbook.log
       mode: restart
       variables:
         cycle_data:
           start_time: "{{ now().isoformat() }}"
-          start_temp: "{{ states('sensor.thermostat_average_temperature') | float(21) }}"
-          outdoor_temp: "{{ states('sensor.outdoor_temperature_celsius') | float(0) }}"
-          setpoint_c: "{{ ((state_attr('climate.smart_thermostat', 'temperature') | float(70) - 32) * 5 / 9) | round(2) }}"
-          temp_delta_c: "{{ (((state_attr('climate.smart_thermostat', 'temperature') | float(70) - 32) * 5 / 9) - (states('sensor.thermostat_average_temperature') | float(21))) | round(2) }}"
+          start_temp: "{{ states('sensor.thermostat_average_temperature') | float(21) | round(2) }}"
+          outdoor_temp: "{{ states('sensor.outdoor_temperature_celsius') | float(0) | round(2) }}"
+          setpoint_c: "{{ state_attr('climate.smart_thermostat', 'temperature') | float(22.2) | round(2) }}"
+          temp_delta_c: "{{ (state_attr('climate.smart_thermostat', 'temperature') | float(22.2) - states('sensor.thermostat_average_temperature') | float(21)) | round(2) }}"
           stage2_delay_used: "{{ states('number.smart_thermostat_stage_2_delay') | int(5) }}"
           stage2_used: false
           stage2_engage_time: null
@@ -440,6 +505,11 @@ thermal_model_learning:
         - platform: time_pattern
           hours: "/1"
           id: periodic_update
+
+        # When the optimal delay calculation changes
+        - platform: state
+          entity_id: sensor.optimal_stage_2_delay
+          id: optimal_delay_changed
 
       variables:
         # Get active preset
@@ -625,33 +695,39 @@ thermal_model_learning:
               Stage2+: {{ states('input_number.thermostat_stage2_additional_rate_' + active_preset) }}°C/hr,
               Loss: {{ states('input_number.thermostat_heat_loss_coefficient_' + active_preset) }}.
               Resetting to defaults.
-        - service: input_number.set_value
-          target:
-            entity_id: "input_number.thermostat_stage1_heating_rate_{{ active_preset }}"
+        - service: script.thermal_model_reset_preset
           data:
-            value: 1.5
-        - service: input_number.set_value
+            preset: "{{ active_preset }}"
+    - id: stage2_large_delta_delay_override
+      alias: "Stage 2: Large Delta Immediate Trigger"
+      description: "Overrides the calculated delay and sets it to 1 minute for rapid heating."
+      mode: single
+
+      trigger:
+        - platform: state
+          entity_id: binary_sensor.stage2_large_delta_trigger
+          to: "on"
+
+      condition:
+        # Only run if heating is currently active
+        - condition: state
+          entity_id: binary_sensor.smart_thermostat_heating_active
+          state: "on"
+        # And if the delay isn't already 1 minute
+        - condition: template
+          value_template: "{{ states('number.smart_thermostat_stage_2_delay') | int != 1 }}"
+
+      action:
+        - service: number.set_value
           target:
-            entity_id: "input_number.thermostat_stage2_additional_rate_{{ active_preset }}"
+            entity_id: number.smart_thermostat_stage_2_delay
           data:
-            value: 1.8
-        - service: input_number.set_value
-          target:
-            entity_id: "input_number.thermostat_heat_loss_coefficient_{{ active_preset }}"
-          data:
-            value: 0.5
-        - service: input_number.set_value
-          target:
-            entity_id: "input_number.thermostat_model_confidence_{{ active_preset }}"
-          data:
-            value: 20
+            value: 1
         - service: logbook.log
           data:
-            name: Thermal Model
-            message: >
-              [{{ active_preset | title }}] Safety reset: Stage1={{ states('input_number.thermostat_stage1_heating_rate_' + active_preset) }},
-              Stage2+={{ states('input_number.thermostat_stage2_additional_rate_' + active_preset) }},
-              Loss={{ states('input_number.thermostat_heat_loss_coefficient_' + active_preset) }}
+            name: "Stage 2 Control"
+            message: "Large delta detected (>3°F). Overriding stage 2 delay to 1 minute for rapid recovery."
+
     - id: thermostat_maintenance_and_seasonal
       alias: "Thermostat: Maintenance & Seasonal"
       description: Filter reminders, seasonal changes, and annual maintenance

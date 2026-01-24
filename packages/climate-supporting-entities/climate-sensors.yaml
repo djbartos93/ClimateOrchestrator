@@ -74,7 +74,7 @@ thermostat_stensors:
         # Outdoor Temperature in Celsius
         # -----------------------------------------------------------------------
         - name: "Outdoor Temperature Celsius"
-          unique_id: "a4b5c6d7-e8f9-a0b1-c2d3-e4f5a6b7c8d9"
+          unique_id: "a4b5c6d7-e8f9-a0b1-c2d3-e4f5a6b7c8d9_v2"
           state_class: measurement
           device_class: temperature
           unit_of_measurement: "°C"
@@ -239,9 +239,8 @@ thermostat_stensors:
           icon: "mdi:thermometer-lines"
           device_class: temperature
           state: >
-            {# The effective_temperature from ESPHome is in °C, convert to °F for UI calculation #}
-            {% set current_temp_c = states('sensor.smart_thermostat_effective_temperature') | float(21) %}
-            {% set current_temp_f = (current_temp_c * 9/5) + 32 %}
+            {# The effective_temperature from ESPHome is already in °F. #}
+            {% set current_temp_f = states('sensor.smart_thermostat_effective_temperature') | float(70) %}
             {% set setpoint_f = state_attr('climate.smart_thermostat', 'temperature') | float(70) %}
             {{ (setpoint_f - current_temp_f) | round(1) }}
 
@@ -281,12 +280,13 @@ thermostat_stensors:
               {% set cycle_data = cycle_json | from_json if cycle_json not in ['', '{}', '[]', 'unknown', 'unavailable'] else {} %}
 
               {% if cycle_data is mapping and cycle_data.start_temp is defined %}
-                {# start_temp is stored in Celsius, effective_temperature is in Fahrenheit #}
+                {# start_temp is stored in Celsius, convert to Fahrenheit for calculation #}
                 {% set start_temp_c = cycle_data.start_temp | float(21) %}
-                {% set start_temp_f = (start_temp_c * 9 / 5) + 32 %}
-                {# The effective_temperature from ESPHome is in °C, convert to °F for UI calculation #}
-                {% set current_temp_c = states('sensor.smart_thermostat_effective_temperature') | float(21) %}
-                {% set current_temp_f = (current_temp_c * 9/5) + 32 %}
+                {% set start_temp_f = (start_temp_c * 9/5) + 32 %}
+                
+                {# The effective_temperature from ESPHome is already in °F #}
+                {% set current_temp_f = states('sensor.smart_thermostat_effective_temperature') | float(70) %}
+                
                 {% set progress = current_temp_f - start_temp_f %}
                 {{ progress | round(2) }}
               {% else %}

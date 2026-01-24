@@ -70,11 +70,11 @@ climate_data_and_control:
           id: weather_evening
           trigger: time
         - entity_id: sensor.smart_thermostat_outdoor_temperature
-          below: -10
+          below: -23
           id: weather_very_cold
           trigger: numeric_state
         - entity_id: sensor.smart_thermostat_outdoor_temperature
-          above: 35
+          above: 2
           id: weather_heat_wave
           trigger: numeric_state
         - trigger: state
