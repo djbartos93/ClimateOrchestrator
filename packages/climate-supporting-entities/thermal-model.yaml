@@ -333,12 +333,32 @@ thermostat_thermal_model:
           unit_of_measurement: "°C"
           state: >
             {% set sp = state_attr('climate.smart_thermostat', 'temperature') | float(22.2) %}
-            {% set uom = state_attr('climate.smart_thermostat', 'temperature_unit') | default('°C') %}
-            {% if uom == '°F' %}
+            {% set uom_raw = state_attr('climate.smart_thermostat', 'temperature_unit') | default('°C') %}
+            {% set uom = (uom_raw | string | lower | trim) %}
+            {% if uom in ['°f', 'f', 'fahrenheit'] %}
               {{ ((sp - 32) * 5 / 9) | round(2) }}
             {% else %}
               {{ sp | round(2) }}
             {% endif %}
+
+        - name: "Smart Thermostat Setpoint Celsius (Robust)"
+          unique_id: "d7c6b5a4-3f2e-1d0c-9b8a-7f6e5d4c3b2a"
+          state_class: measurement
+          unit_of_measurement: "°C"
+          state: >
+            {% set sp = state_attr('climate.smart_thermostat', 'temperature') %}
+            {% if sp in [none, 'unknown', 'unavailable'] %}
+              {{ 22.2 }}
+            {% else %}
+              {% set v = sp | float(22.2) %}
+              {% if v > 45 %}
+                {{ ((v - 32) * 5 / 9) | round(2) }}
+              {% else %}
+                {{ v | round(2) }}
+              {% endif %}
+            {% endif %}
+          availability: >
+            {{ state_attr('climate.smart_thermostat', 'temperature') not in [none, 'unknown', 'unavailable'] }}
 
         # -----------------------------------------------------------------------
         # Current Heat Loss Rate - How fast house is losing heat right now
@@ -351,14 +371,14 @@ thermostat_thermal_model:
           icon: "mdi:arrow-collapse-down"
           state: >
             {% set indoor = states('sensor.thermostat_average_temperature') | float(21) %}
-            {% set outdoor = states('sensor.outdoor_temperature_celsius') | float(0) %}
+            {% set outdoor = states('sensor.outdoor_temperature_celsius_model') | float(0) %}
             {% set preset = states('sensor.active_preset_mode') | lower %}
             {% set k = states('input_number.thermostat_heat_loss_coefficient_' + preset) | float(0.5) %}
             {% set temp_diff = indoor - outdoor %}
             {{ (k * temp_diff) | round(2) }}
           availability: >
             {{ states('sensor.thermostat_average_temperature') not in ['unknown', 'unavailable'] and
-              states('sensor.outdoor_temperature_celsius') not in ['unknown', 'unavailable'] }}
+              states('sensor.outdoor_temperature_celsius_model') not in ['unknown', 'unavailable'] }}
 
         # -----------------------------------------------------------------------
         # Predicted Time to Setpoint (Stage 1 Only)
@@ -370,15 +390,17 @@ thermostat_thermal_model:
           icon: "mdi:clock-fast"
           state: >
             {% set current_temp_c = states('sensor.thermostat_average_temperature') | float(21) %}
-            {% set setpoint_c = states('sensor.smart_thermostat_setpoint_celsius') | float(22.2) %}
+            {% set setpoint_c = states('sensor.smart_thermostat_setpoint_celsius_robust') | float(22.2) %}
             {% set temp_needed = setpoint_c - current_temp_c %}
 
             {% if temp_needed <= 0 %}
               0
             {% else %}
               {% set preset = states('sensor.active_preset_mode') | lower %}
-              {% set heat_loss = states('sensor.current_heat_loss_rate') | float(0) %}
+              {% set confidence = states('input_number.thermostat_model_confidence_' + preset) | int(0) %}
+              {% set heat_loss_raw = states('sensor.current_heat_loss_rate') | float(0) %}
               {% set stage1_rate = states('input_number.thermostat_stage1_heating_rate_' + preset) | float(1.5) %}
+              {% set heat_loss = 0 if confidence <= 35 else heat_loss_raw %}
               {% set net_heating_rate = stage1_rate - heat_loss %}
 
               {% if net_heating_rate <= 0 %}
@@ -398,17 +420,19 @@ thermostat_thermal_model:
           icon: "mdi:clock-fast"
           state: >
             {% set current_temp_c = states('sensor.thermostat_average_temperature') | float(21) %}
-            {% set setpoint_c = states('sensor.smart_thermostat_setpoint_celsius') | float(22.2) %}
+            {% set setpoint_c = states('sensor.smart_thermostat_setpoint_celsius_robust') | float(22.2) %}
             {% set temp_needed = setpoint_c - current_temp_c %}
 
             {% if temp_needed <= 0 %}
               0
             {% else %}
               {% set preset = states('sensor.active_preset_mode') | lower %}
-              {% set heat_loss = states('sensor.current_heat_loss_rate') | float(0) %}
+              {% set confidence = states('input_number.thermostat_model_confidence_' + preset) | int(0) %}
+              {% set heat_loss_raw = states('sensor.current_heat_loss_rate') | float(0) %}
               {% set stage1_rate = states('input_number.thermostat_stage1_heating_rate_' + preset) | float(1.5) %}
               {% set stage2_add = states('input_number.thermostat_stage2_additional_rate_' + preset) | float(1.8) %}
               {% set total_rate = stage1_rate + stage2_add %}
+              {% set heat_loss = 0 if confidence <= 35 else heat_loss_raw %}
               {% set net_heating_rate = total_rate - heat_loss %}
 
               {% if net_heating_rate <= 0 %}
@@ -511,7 +535,7 @@ thermostat_thermal_model:
               {% endif %}
 
               {# Weighted average: 60% stage2, 40% cycles #}
-              {{ ((stage2_score * 0.6 + cycle_score * 0.4) | round(0)) | int }}
+              {{ ((stage2_score * 0.6 + cycle_score * 0.4) | round(0)) | int(0) }}
             {% endif %}
 
         # -----------------------------------------------------------------------
@@ -563,7 +587,6 @@ thermostat_thermal_model:
             {% set last_config = states('input_text.thermostat_last_sensor_config_' + preset) %}
             {{ current_config != last_config and last_config != '' }}
 
-  template:
     - button:
         - name: "Thermal Model Reset (Active Preset)"
           unique_id: "c3d4e5f6-7a8b-9c0d-1e2f-3a4b5c6d7e8f"

@@ -70,19 +70,8 @@ thermal_model_learning:
               It verifies that the final temperature is at or very near the target setpoint
               when the heating cycle ends. Values are normalized to Celsius before comparison.
             #}
-            {% set current = states('sensor.smart_thermostat_effective_temperature') | float(70) %}
-            {% set current_uom = state_attr('sensor.smart_thermostat_effective_temperature', 'unit_of_measurement') %}
-            {% set current_c = current %}
-            {% if current_uom == '°F' %}
-              {% set current_c = (current - 32) * 5 / 9 %}
-            {% endif %}
-
-            {% set setpoint = state_attr('climate.smart_thermostat', 'temperature') | float(21) %}
-            {% set setpoint_uom = state_attr('climate.smart_thermostat', 'temperature_unit') | default('°C') %}
-            {% set setpoint_c = setpoint %}
-            {% if setpoint_uom == '°F' %}
-              {% set setpoint_c = (setpoint - 32) * 5 / 9 %}
-            {% endif %}
+            {% set current_c = states('sensor.thermostat_average_temperature') | float(21) %}
+            {% set setpoint_c = states('sensor.smart_thermostat_setpoint') | float(22.2) %}
 
             {{ current_c >= (setpoint_c - (0.5 * 5 / 9)) }}
       actions:
@@ -242,7 +231,7 @@ thermal_model_learning:
               [{{ active_preset | title }}] Cycle analyzed: {{ cycle_duration }}min,
               {{ temp_rise | round(1) }}°C rise, {{ observed_heating_rate | round(1) }}°C/hr
               rate. Confidence: {{ states('input_number.thermostat_model_confidence_'
-              + active_preset) | int }}%
+              + active_preset) | int(20) }}%
           action: logbook.log
       mode: queued
       max: 5
@@ -416,14 +405,14 @@ thermal_model_learning:
           target:
             entity_id: input_number.thermostat_target_cycle_time
           data:
-            value: "{{ states('sensor.recommended_target_cycle_time') | int }}"
+            value: "{{ states('sensor.recommended_target_cycle_time') | int(25) }}"
         - service: logbook.log
           data:
             name: Thermal Model
             message: >
               Target cycle time set to {{ states('sensor.recommended_target_cycle_time') }}
-              minutes based on house characteristics ({{ states('input_number.thermostat_house_square_feet') | int }}
-              sqft, built {{ states('input_number.thermostat_house_year_built') | int }})
+              minutes based on house characteristics ({{ states('input_number.thermostat_house_square_feet') | int(2000) }}
+              sqft, built {{ states('input_number.thermostat_house_year_built') | int(1980) }})
 
     - id: thermal_model_track_cycle_start
       alias: "Thermal Model: Track Cycle Start"
@@ -448,24 +437,22 @@ thermal_model_learning:
       variables:
         cycle_data:
           start_time: "{{ now().isoformat() }}"
-          start_temp: "{{ states('sensor.thermostat_average_temperature') | float(21) | round(2) }}"
-          outdoor_temp: "{{ states('sensor.outdoor_temperature_celsius') | float(0) | round(2) }}"
-          setpoint_c: >
-            {% set sp = state_attr('climate.smart_thermostat', 'temperature') | float(22.2) %}
-            {% set uom = state_attr('climate.smart_thermostat', 'temperature_unit') | default('°C') %}
-            {% if uom == '°F' %}
-              {{ ((sp - 32) * 5 / 9) | round(2) }}
+          start_temp: >
+            {% set v = states('sensor.thermostat_average_temperature') | float(21) %}
+            {% if v > 45 %}
+              {{ ((v - 32) * 5 / 9) | round(2) }}
             {% else %}
-              {{ sp | round(2) }}
+              {{ v | round(2) }}
             {% endif %}
+          outdoor_temp: "{{ states('sensor.outdoor_temperature_celsius_model') | float(0) | round(2) }}"
+          setpoint_c: "{{ states('sensor.smart_thermostat_setpoint_celsius_robust') | float(22.2) | round(2) }}"
           temp_delta_c: >
-            {% set avg_c = states('sensor.thermostat_average_temperature') | float(21) %}
-            {% set sp = state_attr('climate.smart_thermostat', 'temperature') | float(22.2) %}
-            {% set uom = state_attr('climate.smart_thermostat', 'temperature_unit') | default('°C') %}
-            {% set sp_c = sp %}
-            {% if uom == '°F' %}
-              {% set sp_c = (sp - 32) * 5 / 9 %}
+            {% set avg_raw = states('sensor.thermostat_average_temperature') | float(21) %}
+            {% set avg_c = avg_raw %}
+            {% if avg_raw > 45 %}
+              {% set avg_c = (avg_raw - 32) * 5 / 9 %}
             {% endif %}
+            {% set sp_c = states('sensor.smart_thermostat_setpoint_celsius_robust') | float(22.2) %}
             {{ (sp_c - avg_c) | round(2) }}
           stage2_delay_used: "{{ states('number.smart_thermostat_stage_2_delay') | int(5) }}"
           stage2_used: false
@@ -858,14 +845,14 @@ thermal_model_learning:
           data:
             title: "🔧 Stage 2 Disabled"
             message: >
-              Stage 2 heating has been temporarily disabled for {{ states('input_number.stage2_disable_timeout') | int }} minutes.
-              It will automatically re-enable at {{ (now() + timedelta(minutes=states('input_number.stage2_disable_timeout') | int)).strftime('%I:%M %p') }}.
+              Stage 2 heating has been temporarily disabled for {{ states('input_number.stage2_disable_timeout') | int(120) }} minutes.
+              It will automatically re-enable at {{ (now() + timedelta(minutes=states('input_number.stage2_disable_timeout') | int(120))).strftime('%I:%M %p') }}.
         - service: logbook.log
           data:
             name: "Stage 2 Control"
-            message: "Stage 2 disabled for {{ states('input_number.stage2_disable_timeout') | int }} minutes"
+            message: "Stage 2 disabled for {{ states('input_number.stage2_disable_timeout') | int(120) }} minutes"
         - delay:
-            minutes: "{{ states('input_number.stage2_disable_timeout') | int }}"
+            minutes: "{{ states('input_number.stage2_disable_timeout') | int(120) }}"
         - service: input_boolean.turn_off
           target:
             entity_id: input_boolean.stage2_temporarily_disabled
@@ -878,7 +865,7 @@ thermal_model_learning:
             name: "Stage 2 Control"
             message: "Stage 2 automatically re-enabled after timeout"
 
-    - id: stage2_large_delta_delay_override
+    - id: stage2_large_delta_delay_override_v2
       alias: "Stage 2: Large Delta Delay Override"
       description: Set stage 2 delay to 1 minute when large temperature delta detected
       mode: restart
