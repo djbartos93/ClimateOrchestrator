@@ -38,6 +38,20 @@ thermostat_stensors:
               {# Fallback to local sensor #}
               {{ states('sensor.smart_thermostat_local_temperature') | float(21) }}
             {% endif %}
+
+        - name: "Smart Thermostat Effective Temperature Fahrenheit"
+          unique_id: "c2f1e7d3-1h5e-2d2i-8f3h-2g8i3d2e3f4f"
+          state_class: measurement
+          device_class: temperature
+          unit_of_measurement: "°F"
+          state: >
+            {% set t = states('sensor.smart_thermostat_effective_temperature') | float(70) %}
+            {% set uom = state_attr('sensor.smart_thermostat_effective_temperature', 'unit_of_measurement') %}
+            {% if uom == '°C' %}
+              {{ ((t * 9 / 5) + 32) | round(2) }}
+            {% else %}
+              {{ t | round(2) }}
+            {% endif %}
         # -----------------------------------------------------------------------
         # Humidity Averaging
         # -----------------------------------------------------------------------
@@ -239,8 +253,8 @@ thermostat_stensors:
           icon: "mdi:thermometer-lines"
           device_class: temperature
           state: >
-            {# The effective_temperature from ESPHome is already in °F. #}
-            {% set current_temp_f = states('sensor.smart_thermostat_effective_temperature') | float(70) %}
+            {# Use the normalized Fahrenheit sensor (handles ESPHome publishing °C). #}
+            {% set current_temp_f = states('sensor.smart_thermostat_effective_temperature_fahrenheit') | float(70) %}
             {% set setpoint_f = state_attr('climate.smart_thermostat', 'temperature') | float(70) %}
             {{ (setpoint_f - current_temp_f) | round(1) }}
 
@@ -284,8 +298,8 @@ thermostat_stensors:
                 {% set start_temp_c = cycle_data.start_temp | float(21) %}
                 {% set start_temp_f = (start_temp_c * 9/5) + 32 %}
                 
-                {# The effective_temperature from ESPHome is already in °F #}
-                {% set current_temp_f = states('sensor.smart_thermostat_effective_temperature') | float(70) %}
+                {# Use the normalized Fahrenheit sensor (handles ESPHome publishing °C). #}
+                {% set current_temp_f = states('sensor.smart_thermostat_effective_temperature_fahrenheit') | float(70) %}
                 
                 {% set progress = current_temp_f - start_temp_f %}
                 {{ progress | round(2) }}
@@ -479,7 +493,7 @@ thermostat_stensors:
     # Temperature derivative - 5 minute window
     - platform: derivative
       name: "Temperature Change Rate (5min)"
-      source: sensor.smart_thermostat_effective_temperature
+      source: sensor.smart_thermostat_effective_temperature_fahrenheit
       time_window: "00:05:00"
       unit_time: min
       unit: "°F"
@@ -488,7 +502,7 @@ thermostat_stensors:
     # Temperature derivative - 10 minute window (smoother)
     - platform: derivative
       name: "Temperature Change Rate (10min)"
-      source: sensor.smart_thermostat_effective_temperature
+      source: sensor.smart_thermostat_effective_temperature_fahrenheit
       time_window: "00:10:00"
       unit_time: min
       unit: "°F"

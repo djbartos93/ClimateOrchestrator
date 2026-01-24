@@ -68,11 +68,23 @@ thermal_model_learning:
             {#
               This condition ensures we only learn from successful heating cycles.
               It verifies that the final temperature is at or very near the target setpoint
-              when the heating cycle ends. Both sensors provide values in Fahrenheit.
+              when the heating cycle ends. Values are normalized to Celsius before comparison.
             #}
-            {% set current_f = states('sensor.smart_thermostat_effective_temperature') | float(70) %}
-            {% set setpoint_f = state_attr('climate.smart_thermostat', 'temperature') | float(70) %}
-            {{ current_f >= (setpoint_f - 0.5) }}
+            {% set current = states('sensor.smart_thermostat_effective_temperature') | float(70) %}
+            {% set current_uom = state_attr('sensor.smart_thermostat_effective_temperature', 'unit_of_measurement') %}
+            {% set current_c = current %}
+            {% if current_uom == '°F' %}
+              {% set current_c = (current - 32) * 5 / 9 %}
+            {% endif %}
+
+            {% set setpoint = state_attr('climate.smart_thermostat', 'temperature') | float(21) %}
+            {% set setpoint_uom = state_attr('climate.smart_thermostat', 'temperature_unit') | default('°C') %}
+            {% set setpoint_c = setpoint %}
+            {% if setpoint_uom == '°F' %}
+              {% set setpoint_c = (setpoint - 32) * 5 / 9 %}
+            {% endif %}
+
+            {{ current_c >= (setpoint_c - (0.5 * 5 / 9)) }}
       actions:
         # Increment both per-preset and global counters
         - target:
@@ -438,8 +450,23 @@ thermal_model_learning:
           start_time: "{{ now().isoformat() }}"
           start_temp: "{{ states('sensor.thermostat_average_temperature') | float(21) | round(2) }}"
           outdoor_temp: "{{ states('sensor.outdoor_temperature_celsius') | float(0) | round(2) }}"
-          setpoint_c: "{{ state_attr('climate.smart_thermostat', 'temperature') | float(22.2) | round(2) }}"
-          temp_delta_c: "{{ (state_attr('climate.smart_thermostat', 'temperature') | float(22.2) - states('sensor.thermostat_average_temperature') | float(21)) | round(2) }}"
+          setpoint_c: >
+            {% set sp = state_attr('climate.smart_thermostat', 'temperature') | float(22.2) %}
+            {% set uom = state_attr('climate.smart_thermostat', 'temperature_unit') | default('°C') %}
+            {% if uom == '°F' %}
+              {{ ((sp - 32) * 5 / 9) | round(2) }}
+            {% else %}
+              {{ sp | round(2) }}
+            {% endif %}
+          temp_delta_c: >
+            {% set avg_c = states('sensor.thermostat_average_temperature') | float(21) %}
+            {% set sp = state_attr('climate.smart_thermostat', 'temperature') | float(22.2) %}
+            {% set uom = state_attr('climate.smart_thermostat', 'temperature_unit') | default('°C') %}
+            {% set sp_c = sp %}
+            {% if uom == '°F' %}
+              {% set sp_c = (sp - 32) * 5 / 9 %}
+            {% endif %}
+            {{ (sp_c - avg_c) | round(2) }}
           stage2_delay_used: "{{ states('number.smart_thermostat_stage_2_delay') | int(5) }}"
           stage2_used: false
           stage2_engage_time: null

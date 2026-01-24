@@ -238,7 +238,7 @@ After 1-2 months of heating season:
 **Key Entities:**
 - `binary_sensor.smart_thermostat_heating_active`
 - `binary_sensor.smart_thermostat_stage_2_active`
-- `sensor.smart_thermostat_effective_temperature` (°F)
+- `sensor.smart_thermostat_effective_temperature` (°C)
 - `climate.smart_thermostat` (setpoint in temperature attribute)
 
 ### Phase 1 Architecture Additions

@@ -33,7 +33,7 @@ esphome compile thermostat-config/main.yaml  # Test compilation
 
 **Gotchas**:
 - Packages loaded from GitHub via `github_ref` substitution
-- Temperature internally in Celsius, `effective_temperature` sensor in Fahrenheit
+- Temperature internally in Celsius; `effective_temperature` is published as Celsius and Home Assistant provides a normalized Fahrenheit helper sensor for UI-facing °F values
 - Boot lockout prevents HVAC for ~60s after startup
 - `id()` references globals, sensors, switches by their internal ID
 

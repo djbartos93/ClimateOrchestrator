@@ -164,7 +164,7 @@ ha core restart
 | Entity | Purpose |
 |--------|---------|
 | `climate.smart_thermostat` | Main climate control |
-| `sensor.smart_thermostat_effective_temperature` | Current temperature (°F) |
+| `sensor.smart_thermostat_effective_temperature` | Current temperature (°C) |
 | `sensor.smart_thermostat_local_temperature` | DHT22 sensor |
 | `sensor.smart_thermostat_outdoor_temperature` | From Home Assistant |
 | `binary_sensor.smart_thermostat_heating_active` | Heating on/off |
@@ -204,7 +204,7 @@ Thermal model parameters are validated every 6 hours and reset if out of bounds:
 ## Temperature Units
 
 - **ESPHome internal**: Celsius
-- **ESPHome effective_temperature sensor**: Fahrenheit
+- **ESPHome effective_temperature sensor**: Celsius
 - **Home Assistant templates**: Convert as needed
 - **Zigbee sensors**: Usually Fahrenheit (converted in templates)
 

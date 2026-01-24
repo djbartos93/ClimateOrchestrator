@@ -326,6 +326,20 @@ thermostat_thermal_model:
               home
             {% endif %}
 
+        - name: "Smart Thermostat Setpoint Celsius"
+          unique_id: "b1c2d3e4-5f6a-7b8c-9d0e-1f2a3b4c5d6e"
+          state_class: measurement
+          device_class: temperature
+          unit_of_measurement: "°C"
+          state: >
+            {% set sp = state_attr('climate.smart_thermostat', 'temperature') | float(22.2) %}
+            {% set uom = state_attr('climate.smart_thermostat', 'temperature_unit') | default('°C') %}
+            {% if uom == '°F' %}
+              {{ ((sp - 32) * 5 / 9) | round(2) }}
+            {% else %}
+              {{ sp | round(2) }}
+            {% endif %}
+
         # -----------------------------------------------------------------------
         # Current Heat Loss Rate - How fast house is losing heat right now
         # Uses preset-specific heat loss coefficient
@@ -356,7 +370,7 @@ thermostat_thermal_model:
           icon: "mdi:clock-fast"
           state: >
             {% set current_temp_c = states('sensor.thermostat_average_temperature') | float(21) %}
-            {% set setpoint_c = state_attr('climate.smart_thermostat', 'temperature') | float(22.2) %}
+            {% set setpoint_c = states('sensor.smart_thermostat_setpoint_celsius') | float(22.2) %}
             {% set temp_needed = setpoint_c - current_temp_c %}
 
             {% if temp_needed <= 0 %}
@@ -384,7 +398,7 @@ thermostat_thermal_model:
           icon: "mdi:clock-fast"
           state: >
             {% set current_temp_c = states('sensor.thermostat_average_temperature') | float(21) %}
-            {% set setpoint_c = state_attr('climate.smart_thermostat', 'temperature') | float(22.2) %}
+            {% set setpoint_c = states('sensor.smart_thermostat_setpoint_celsius') | float(22.2) %}
             {% set temp_needed = setpoint_c - current_temp_c %}
 
             {% if temp_needed <= 0 %}
@@ -548,6 +562,33 @@ thermostat_thermal_model:
             {% set current_config = states('sensor.active_temperature_sensor_config') %}
             {% set last_config = states('input_text.thermostat_last_sensor_config_' + preset) %}
             {{ current_config != last_config and last_config != '' }}
+
+  template:
+    - button:
+        - name: "Thermal Model Reset (Active Preset)"
+          unique_id: "c3d4e5f6-7a8b-9c0d-1e2f-3a4b5c6d7e8f"
+          icon: mdi:restart
+          press:
+            - service: script.thermal_model_reset_preset
+              data:
+                preset: "{{ states('sensor.active_preset_mode') | lower }}"
+
+        - name: "Thermal Model Reset (All Presets)"
+          unique_id: "d4e5f6a7-8b9c-0d1e-2f3a-4b5c6d7e8f9a"
+          icon: mdi:restart-alert
+          press:
+            - service: script.thermal_model_reset_preset
+              data:
+                preset: home
+            - service: script.thermal_model_reset_preset
+              data:
+                preset: away
+            - service: script.thermal_model_reset_preset
+              data:
+                preset: sleep
+            - service: script.thermal_model_reset_preset
+              data:
+                preset: boost
 
   # =============================================================================
   # HELPER ENTITIES for Learning System
