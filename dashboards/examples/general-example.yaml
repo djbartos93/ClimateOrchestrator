@@ -1,0 +1,1117 @@
+views:
+  - title: Home
+    type: sections
+    cards: []
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: New section
+          - type: vertical-stack
+            cards:
+              - type: horizontal-stack
+                cards:
+                  - type: thermostat
+                    entity: climate.smart_thermostat
+                    name: Climate Control
+                  - type: entities
+                    title: Current Conditions
+                    entities:
+                      - entity: sensor.smart_thermostat_effective_temperature
+                        name: Temperature
+                      - entity: sensor.smart_thermostat_effective_humidity
+                        name: Humidity
+                      - entity: sensor.smart_thermostat_outdoor_temperature
+                        name: Outdoor Temp
+                      - entity: sensor.smart_thermostat_outdoor_humidity
+                        name: Outdoor Humidity
+                      - type: divider
+                      - entity: sensor.smart_thermostat_temperature_source
+                        name: Temp Source
+                      - entity: sensor.smart_thermostat_humidity_source
+                        name: Humidity Source
+          - type: vertical-stack
+            cards:
+              - type: entities
+                title: Preset Modes & House Status
+                entities:
+                  - entity: input_select.house_mode
+                    name: House Mode
+                  - entity: sensor.active_preset_mode
+                    name: Active Preset
+                  - entity: binary_sensor.everyone_away
+                    name: Everyone Away
+                  - type: divider
+                  - entity: sensor.active_temperature_sensor_config
+                    name: Active Sensors
+              - type: horizontal-stack
+                cards:
+                  - type: entities
+                    title: Temperature Sensors
+                    show_header_toggle: false
+                    entities:
+                      - entity: input_boolean.thermostat_use_living_room_temp
+                        name: Living Room
+                      - entity: input_boolean.thermostat_use_bedroom_temp
+                        name: Bedroom
+                      - entity: input_boolean.thermostat_use_kitchen_temp
+                        name: Kitchen
+                      - entity: input_boolean.thermostat_use_office_temp
+                  - type: entities
+                    title: Humidity Sensors
+                    show_header_toggle: false
+                    entities:
+                      - entity: input_boolean.thermostat_use_living_room_humidity
+                        name: Living Room
+                      - entity: input_boolean.thermostat_use_bedroom_humidity
+                        name: Bedroom
+                      - entity: input_boolean.thermostat_use_kitchen_humidity
+                        name: Kitchen
+                      - entity: input_boolean.thermostat_use_office_humidity
+          - type: vertical-stack
+            cards:
+              - type: entities
+                title: Ecobee Integration
+                show_header_toggle: false
+                entities:
+                  - entity: switch.smart_thermostat_ecobee_passthrough_mode
+                    name: Passthrough Mode
+                  - entity: input_boolean.ecobee_passthrough_on_vacation
+                    name: Auto Passthrough on Vacation
+                  - type: divider
+                  - entity: sensor.thermostat_ecobee_passthrough_status
+                    name: Status
+              - type: horizontal-stack
+                cards:
+                  - type: entities
+                    title: Ecobee Inputs
+                    show_header_toggle: false
+                    entities:
+                      - entity: >-
+                          binary_sensor.smart_thermostat_ecobee_heat_stage_1_input
+                        name: W1 (Heat 1)
+                      - entity: >-
+                          binary_sensor.smart_thermostat_ecobee_heat_stage_2_input
+                        name: W2 (Heat 2)
+                      - entity: binary_sensor.smart_thermostat_ecobee_cooling_input
+                        name: Y1 (Cool)
+                      - entity: binary_sensor.smart_thermostat_ecobee_fan_input
+                        name: G (Fan)
+                  - type: entities
+                    title: System Comparison
+                    show_header_toggle: false
+                    entities:
+                      - entity: sensor.thermostat_system_mismatch_status
+                        name: Mismatch Status
+                      - entity: binary_sensor.thermostat_system_mismatch_detected
+                        name: Mismatch Alert
+          - type: entities
+            title: Filter Maintenance
+            show_header_toggle: false
+            entities:
+              - entity: sensor.smart_thermostat_filter_runtime
+                name: Filter Runtime
+              - entity: number.smart_thermostat_filter_runtime_threshold
+                name: Change Threshold
+              - type: divider
+              - entity: button.smart_thermostat_reset_filter_runtime
+                name: Reset Filter Runtime
+                icon: mdi:restart
+      - type: grid
+        cards:
+          - type: heading
+            heading: New section
+          - type: horizontal-stack
+            cards:
+              - type: entities
+                title: HVAC Activity
+                show_header_toggle: false
+                entities:
+                  - entity: binary_sensor.smart_thermostat_heating_active
+                    name: Heating
+                  - entity: binary_sensor.smart_thermostat_cooling_active
+                    name: Cooling
+                  - entity: binary_sensor.smart_thermostat_stage_2_active
+                    name: Stage 2
+                  - entity: switch.smart_thermostat_humidifier_relay
+                    name: Humidifier
+                  - type: divider
+                  - entity: sensor.smart_thermostat_stage_2_delay_remaining
+                    name: Stage 2 Delay
+                  - entity: sensor.smart_thermostat_min_runtime_remaining
+                    name: Min Runtime
+                  - entity: sensor.smart_thermostat_compressor_lockout_remaining
+                    name: Compressor Lockout
+              - type: entities
+                title: Safety & Alerts
+                show_header_toggle: false
+                entities:
+                  - entity: binary_sensor.smart_thermostat_humidifier_safe_to_run
+                    name: Humidifier Safe
+                  - entity: >-
+                      binary_sensor.smart_thermostat_hvac_safety_interlock_active
+                    name: Safety Interlock
+                  - entity: binary_sensor.smart_thermostat_remote_temperature_stale
+                    name: Remote Temp Stale
+                  - entity: binary_sensor.smart_thermostat_remote_humidity_stale
+                    name: Remote Humid Stale
+                  - type: divider
+                  - entity: sensor.smart_thermostat_wifi_signal
+                    name: WiFi Signal
+                  - entity: binary_sensor.smart_thermostat_status
+                    name: Device Online
+          - type: vertical-stack
+            cards:
+              - type: entities
+                title: Runtime Statistics - Today
+                show_header_toggle: false
+                entities:
+                  - entity: sensor.smart_thermostat_heat_stage_1_runtime_today
+                    name: Heat Stage 1
+                  - entity: sensor.smart_thermostat_heat_stage_2_runtime_today
+                    name: Heat Stage 2
+                  - entity: sensor.heating_runtime_today
+                    name: Total Heating
+                  - type: divider
+                  - entity: sensor.cooling_runtime_today
+                    name: Cooling
+                  - type: divider
+                  - entity: sensor.humidifier_runtime_today
+                    name: Humidifier
+                  - type: divider
+                  - entity: counter.thermostat_heating_cycles_today
+                    name: Heating Cycles
+                  - entity: counter.thermostat_cooling_cycles_today
+                    name: Cooling Cycles
+              - type: entities
+                title: Control Time - Today
+                show_header_toggle: false
+                entities:
+                  - entity: sensor.smart_thermostat_control_time_today
+                    name: Smart Thermostat
+                  - entity: sensor.ecobee_control_time_today
+                    name: Ecobee Passthrough
+          - type: entities
+            title: Runtime Statistics - This Week
+            show_header_toggle: false
+            entities:
+              - entity: sensor.heating_runtime_this_week
+                name: Total Heating
+              - entity: sensor.stage_2_runtime_this_week
+                name: Stage 2 Runtime
+              - entity: sensor.heating_cycles_this_week
+                name: Heating Cycles
+              - type: divider
+              - entity: sensor.outdoor_temperature_avg_week
+                name: Avg Outdoor Temp
+          - type: vertical-stack
+            cards:
+              - type: entities
+                title: Humidifier Control
+                show_header_toggle: false
+                entities:
+                  - entity: switch.smart_thermostat_humidifier_enable
+                    name: Humidifier Enable
+                  - entity: switch.smart_thermostat_humidifier_manual_control
+                    name: Manual Control
+                  - type: divider
+                  - entity: sensor.thermostat_average_humidity
+                    name: Current Humidity
+                  - entity: sensor.smart_thermostat_humidifier_setpoint
+                    name: Active Setpoint
+                  - type: divider
+                  - entity: input_boolean.humidifier_manual_setpoint
+                    name: Manual Setpoint Mode
+                  - entity: input_number.humidifier_manual_setpoint
+                    name: Manual Setpoint
+              - type: entities
+                title: Humidifier Auto Calculation
+                show_header_toggle: false
+                entities:
+                  - entity: sensor.humidifier_auto_setpoint
+                    name: Auto Setpoint
+                  - entity: sensor.humidifier_effective_setpoint
+                    name: Effective Setpoint
+                  - type: section
+                    label: Based on outdoor conditions
+                  - entity: sensor.smart_thermostat_outdoor_temperature
+                    name: Outdoor Temperature
+                  - entity: sensor.smart_thermostat_outdoor_humidity
+                    name: Outdoor Humidity
+          - type: history-graph
+            title: HVAC Activity - 24 Hours
+            hours_to_show: 24
+            refresh_interval: 60
+            entities:
+              - entity: binary_sensor.smart_thermostat_heating_active
+                name: Heating
+              - entity: binary_sensor.smart_thermostat_stage_2_active
+                name: Stage 2
+              - entity: binary_sensor.smart_thermostat_cooling_active
+                name: Cooling
+              - entity: switch.smart_thermostat_humidifier_relay
+                name: Humidifier
+            grid_options:
+              columns: 24
+              rows: auto
+        column_span: 2
+      - type: grid
+        cards:
+          - type: heading
+            heading: New section
+          - type: history-graph
+            title: Temperature History - 24 Hours
+            hours_to_show: 24
+            refresh_interval: 60
+            entities:
+              - entity: sensor.smart_thermostat_compensated_temperature
+                name: Compensated Temp
+              - entity: sensor.thermostat_average_temperature
+                name: Averaged Temp
+              - entity: sensor.smart_thermostat_local_temperature
+                name: Local DHT22
+              - entity: sensor.smart_thermostat_outdoor_temperature
+                name: Outdoor Temp
+          - type: history-graph
+            title: Humidity History - 24 Hours
+            hours_to_show: 24
+            refresh_interval: 60
+            entities:
+              - entity: sensor.thermostat_average_humidity
+                name: Averaged Humidity
+              - entity: sensor.smart_thermostat_local_humidity
+                name: Local DHT22
+              - entity: sensor.smart_thermostat_outdoor_humidity
+                name: Outdoor Humidity
+              - entity: sensor.smart_thermostat_humidifier_setpoint
+                name: Humidifier Setpoint
+          - type: entities
+            title: System Information
+            show_header_toggle: false
+            entities:
+              - entity: sensor.smart_thermostat_uptime
+                name: Uptime
+              - entity: sensor.smart_thermostat_wifi_signal
+                name: WiFi Signal
+              - entity: sensor.smart_thermostat_ip_address
+                name: IP Address
+              - entity: sensor.smart_thermostat_ssid
+                name: Connected SSID
+              - entity: sensor.smart_thermostat_esphome_version
+                name: ESPHome Version
+              - type: divider
+              - entity: button.smart_thermostat_emergency_stop
+                name: Emergency Stop
+                icon: mdi:alert-octagon
+      - type: grid
+        cards:
+          - type: heading
+            heading: New section
+          - type: vertical-stack
+            cards:
+              - type: markdown
+                content: >
+                  ## Thermal Model Parameters
+
+                  These parameters are learned automatically. Higher confidence
+                  = more reliable predictions.
+              - type: horizontal-stack
+                cards:
+                  - type: entities
+                    title: Home Preset
+                    show_header_toggle: false
+                    entities:
+                      - entity: input_number.thermostat_model_confidence_home
+                        name: Confidence
+                      - type: divider
+                      - entity: input_number.thermostat_heat_loss_coefficient_home
+                        name: Heat Loss Coeff
+                      - entity: input_number.thermostat_stage1_heating_rate_home
+                        name: Stage 1 Rate
+                      - entity: input_number.thermostat_stage2_additional_rate_home
+                        name: Stage 2 Add Rate
+                  - type: entities
+                    title: Away Preset
+                    show_header_toggle: false
+                    entities:
+                      - entity: input_number.thermostat_model_confidence_away
+                        name: Confidence
+                      - type: divider
+                      - entity: input_number.thermostat_heat_loss_coefficient_away
+                        name: Heat Loss Coeff
+                      - entity: input_number.thermostat_stage1_heating_rate_away
+                        name: Stage 1 Rate
+                      - entity: input_number.thermostat_stage2_additional_rate_away
+                        name: Stage 2 Add Rate
+              - type: horizontal-stack
+                cards:
+                  - type: entities
+                    title: Sleep Preset
+                    show_header_toggle: false
+                    entities:
+                      - entity: input_number.thermostat_model_confidence_sleep
+                        name: Confidence
+                      - type: divider
+                      - entity: input_number.thermostat_heat_loss_coefficient_sleep
+                        name: Heat Loss Coeff
+                      - entity: input_number.thermostat_stage1_heating_rate_sleep
+                        name: Stage 1 Rate
+                      - entity: input_number.thermostat_stage2_additional_rate_sleep
+                        name: Stage 2 Add Rate
+                  - type: entities
+                    title: Boost Preset
+                    show_header_toggle: false
+                    entities:
+                      - entity: input_number.thermostat_model_confidence_boost
+                        name: Confidence
+                      - type: divider
+                      - entity: input_number.thermostat_heat_loss_coefficient_boost
+                        name: Heat Loss Coeff
+                      - entity: input_number.thermostat_stage1_heating_rate_boost
+                        name: Stage 1 Rate
+                      - entity: input_number.thermostat_stage2_additional_rate_boost
+                        name: Stage 2 Add Rate
+              - type: entities
+                title: Global Parameters
+                show_header_toggle: false
+                entities:
+                  - entity: input_number.thermostat_thermal_mass
+                    name: Thermal Mass (τ)
+                  - type: divider
+                  - entity: input_number.thermostat_house_square_feet
+                    name: House Size
+                  - entity: input_number.thermostat_house_year_built
+                    name: Year Built
+            grid_options:
+              columns: 24
+              rows: auto
+          - type: vertical-stack
+            cards:
+              - type: entities
+                title: Thermal Model - Status
+                show_header_toggle: false
+                entities:
+                  - entity: sensor.thermal_model_status
+                    name: Model Status
+                  - entity: sensor.active_preset_mode
+                    name: Active Preset
+                  - entity: binary_sensor.sensor_configuration_changed
+                    name: Config Changed
+                  - type: divider
+                  - entity: counter.thermostat_cycles_analyzed
+                    name: Cycles Analyzed
+                  - entity: input_datetime.thermostat_last_model_update
+                    name: Last Update
+              - type: horizontal-stack
+                cards:
+                  - type: entities
+                    title: Predictions
+                    show_header_toggle: false
+                    entities:
+                      - entity: sensor.predicted_time_to_setpoint_stage_1
+                        name: Time (Stage 1 Only)
+                      - entity: sensor.predicted_time_to_setpoint_stage_1_2
+                        name: Time (Both Stages)
+                      - entity: sensor.optimal_stage_2_delay
+                        name: Optimal Stage 2 Delay
+                      - entity: binary_sensor.stage_2_recommended
+                        name: Stage 2 Recommended
+                  - type: entities
+                    title: Performance
+                    show_header_toggle: false
+                    entities:
+                      - entity: sensor.current_heat_loss_rate
+                        name: Heat Loss Rate
+                      - entity: sensor.heating_efficiency_score
+                        name: Efficiency Score
+                      - type: divider
+                      - entity: input_number.thermostat_target_cycle_time
+                        name: Target Cycle Time
+                      - entity: sensor.recommended_target_cycle_time
+                        name: Recommended
+            grid_options:
+              columns: 24
+              rows: auto
+        column_span: 2
+      - type: grid
+        cards:
+          - type: heading
+            heading: New section
+          - type: entities
+            title: Temperature Sensor Details
+            show_header_toggle: false
+            entities:
+              - entity: sensor.thermostat_average_temperature
+                name: Averaged Temperature
+              - entity: sensor.smart_thermostat_local_temperature
+                name: Local DHT22
+              - entity: sensor.smart_thermostat_remote_temperature
+                name: Remote (HA)
+              - entity: sensor.smart_thermostat_ecobee_temperature
+                name: Ecobee
+              - type: divider
+              - entity: sensor.smart_thermostat_feels_like_temperature
+                name: Feels Like Temp
+              - entity: sensor.smart_thermostat_compensated_temperature
+                name: Compensated Temp (Used)
+              - type: divider
+              - entity: switch.smart_thermostat_use_ecobee_temperature
+                name: Use Ecobee as Primary
+              - entity: switch.smart_thermostat_use_feels_like_temperature
+                name: Use Feels Like Compensation
+          - type: vertical-stack
+            cards:
+              - type: entities
+                title: Maintenance Mode
+                show_header_toggle: false
+                state_color: true
+                entities:
+                  - entity: switch.smart_thermostat_maintenance_mode
+                    name: Enable Maintenance Mode
+                  - entity: switch.smart_thermostat_maintenance_mode_keep_enabled
+                    name: Keep Enabled (Disable Timer)
+                  - type: section
+                    label: Manual Controls (Only active in maintenance mode)
+              - type: horizontal-stack
+                cards:
+                  - type: entities
+                    title: Manual Relay Control
+                    show_header_toggle: false
+                    state_color: true
+                    entities:
+                      - entity: switch.smart_thermostat_maintenance_heat_stage_1
+                        name: Heat Stage 1
+                        tap_action:
+                          action: toggle
+                      - entity: switch.smart_thermostat_maintenance_heat_stage_2
+                        name: Heat Stage 2
+                        tap_action:
+                          action: toggle
+                      - entity: switch.smart_thermostat_maintenance_cooling
+                        name: Cooling
+                        tap_action:
+                          action: toggle
+                      - entity: switch.smart_thermostat_maintenance_fan
+                        name: Fan
+                        tap_action:
+                          action: toggle
+                  - type: markdown
+                    content: >
+                      ### Maintenance Mode Safety
+
+
+                      **Auto-Disable:** 30 minutes
+
+
+                      **Warning:** Climate control is disabled in maintenance
+                      mode. Use for testing only.
+
+
+                      **Manual Controls:** Only work when maintenance mode is
+                      enabled.
+          - type: vertical-stack
+            cards:
+              - type: markdown
+                content: |
+                  ## Advanced Settings
+                  Fine-tune system behavior and timing parameters
+              - type: horizontal-stack
+                cards:
+                  - type: entities
+                    title: Stage 2 & Delays
+                    show_header_toggle: false
+                    entities:
+                      - entity: number.smart_thermostat_stage_2_delay
+                        name: Stage 2 Delay
+                      - entity: sensor.optimal_stage_2_delay
+                        name: Model Optimal Delay
+                      - type: divider
+                      - entity: number.smart_thermostat_min_heat_run_time
+                        name: Min Heat Runtime
+                      - entity: number.smart_thermostat_min_cool_run_time
+                        name: Min Cool Runtime
+                  - type: entities
+                    title: Compressor Protection
+                    show_header_toggle: false
+                    entities:
+                      - entity: number.smart_thermostat_min_compressor_off_time
+                        name: Min Off Time
+                      - entity: number.smart_thermostat_min_compressor_run_time
+                        name: Min Run Time
+                      - type: divider
+                      - entity: sensor.smart_thermostat_compressor_lockout_remaining
+                        name: Lockout Remaining
+              - type: horizontal-stack
+                cards:
+                  - type: entities
+                    title: Fan Control
+                    show_header_toggle: false
+                    entities:
+                      - entity: number.smart_thermostat_fan_post_run_time_heat
+                        name: Post-Run (Heat)
+                      - entity: number.smart_thermostat_fan_post_run_time_cool
+                        name: Post-Run (Cool)
+                  - type: entities
+                    title: Temperature Control
+                    show_header_toggle: false
+                    entities:
+                      - entity: number.smart_thermostat_thermostat_deadband
+                        name: Temperature Deadband
+            grid_options:
+              columns: 24
+              rows: auto
+          - type: history-graph
+            title: Thermal Model Metrics - 7 Days
+            hours_to_show: 168
+            refresh_interval: 300
+            entities:
+              - entity: sensor.heating_efficiency_score
+                name: Efficiency Score
+              - entity: sensor.current_heat_loss_rate
+                name: Heat Loss Rate
+              - entity: input_number.thermostat_model_confidence_home
+                name: Home Confidence
+              - entity: input_number.thermostat_model_confidence_away
+                name: Away Confidence
+            grid_options:
+              columns: 24
+              rows: auto
+        column_span: 2
+  - title: Home
+    type: masonry
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: markdown
+            content: |
+              # Smart Thermostat Control Center
+              Complete control and monitoring for your smart thermostat system
+          - type: horizontal-stack
+            cards:
+              - type: thermostat
+                entity: climate.smart_thermostat
+                name: Climate Control
+              - type: entities
+                title: Current Conditions
+                entities:
+                  - entity: sensor.smart_thermostat_effective_temperature
+                    name: Temperature
+                  - entity: sensor.smart_thermostat_effective_humidity
+                    name: Humidity
+                  - entity: sensor.smart_thermostat_outdoor_temperature
+                    name: Outdoor Temp
+                  - entity: sensor.smart_thermostat_outdoor_humidity
+                    name: Outdoor Humidity
+                  - type: divider
+                  - entity: sensor.smart_thermostat_temperature_source
+                    name: Temp Source
+                  - entity: sensor.smart_thermostat_humidity_source
+                    name: Humidity Source
+      - type: horizontal-stack
+        cards:
+          - type: entities
+            title: HVAC Activity
+            show_header_toggle: false
+            entities:
+              - entity: binary_sensor.smart_thermostat_heating_active
+                name: Heating
+              - entity: binary_sensor.smart_thermostat_cooling_active
+                name: Cooling
+              - entity: binary_sensor.smart_thermostat_stage_2_active
+                name: Stage 2
+              - entity: switch.smart_thermostat_humidifier_relay
+                name: Humidifier
+              - type: divider
+              - entity: sensor.smart_thermostat_stage_2_delay_remaining
+                name: Stage 2 Delay
+              - entity: sensor.smart_thermostat_min_runtime_remaining
+                name: Min Runtime
+              - entity: sensor.smart_thermostat_compressor_lockout_remaining
+                name: Compressor Lockout
+          - type: entities
+            title: Safety & Alerts
+            show_header_toggle: false
+            entities:
+              - entity: binary_sensor.smart_thermostat_humidifier_safe_to_run
+                name: Humidifier Safe
+              - entity: binary_sensor.smart_thermostat_hvac_safety_interlock_active
+                name: Safety Interlock
+              - entity: binary_sensor.smart_thermostat_remote_temperature_stale
+                name: Remote Temp Stale
+              - entity: binary_sensor.smart_thermostat_remote_humidity_stale
+                name: Remote Humid Stale
+              - type: divider
+              - entity: sensor.smart_thermostat_wifi_signal
+                name: WiFi Signal
+              - entity: binary_sensor.smart_thermostat_status
+                name: Device Online
+      - type: vertical-stack
+        cards:
+          - type: entities
+            title: Preset Modes & House Status
+            entities:
+              - entity: input_select.house_mode
+                name: House Mode
+              - entity: sensor.active_preset_mode
+                name: Active Preset
+              - entity: binary_sensor.everyone_away
+                name: Everyone Away
+              - type: divider
+              - entity: sensor.active_temperature_sensor_config
+                name: Active Sensors
+          - type: horizontal-stack
+            cards:
+              - type: entities
+                title: Temperature Sensors
+                show_header_toggle: false
+                entities:
+                  - entity: input_boolean.thermostat_use_living_room_temp
+                    name: Living Room
+                  - entity: input_boolean.thermostat_use_bedroom_temp
+                    name: Bedroom
+                  - entity: input_boolean.thermostat_use_kitchen_temp
+                    name: Kitchen
+              - type: entities
+                title: Humidity Sensors
+                show_header_toggle: false
+                entities:
+                  - entity: input_boolean.thermostat_use_living_room_humidity
+                    name: Living Room
+                  - entity: input_boolean.thermostat_use_bedroom_humidity
+                    name: Bedroom
+                  - entity: input_boolean.thermostat_use_kitchen_humidity
+                    name: Kitchen
+      - type: entities
+        title: Temperature Sensor Details
+        show_header_toggle: false
+        entities:
+          - entity: sensor.thermostat_average_temperature
+            name: Averaged Temperature
+          - entity: sensor.smart_thermostat_local_temperature
+            name: Local DHT22
+          - entity: sensor.smart_thermostat_remote_temperature
+            name: Remote (HA)
+          - entity: sensor.smart_thermostat_ecobee_temperature
+            name: Ecobee
+          - type: divider
+          - entity: sensor.smart_thermostat_feels_like_temperature
+            name: Feels Like Temp
+          - entity: sensor.smart_thermostat_compensated_temperature
+            name: Compensated Temp (Used)
+          - type: divider
+          - entity: switch.smart_thermostat_use_ecobee_temperature
+            name: Use Ecobee as Primary
+          - entity: switch.smart_thermostat_use_feels_like_temperature
+            name: Use Feels Like Compensation
+      - type: vertical-stack
+        cards:
+          - type: entities
+            title: Humidifier Control
+            show_header_toggle: false
+            entities:
+              - entity: switch.smart_thermostat_humidifier_enable
+                name: Humidifier Enable
+              - entity: switch.smart_thermostat_humidifier_manual_control
+                name: Manual Control
+              - type: divider
+              - entity: sensor.thermostat_average_humidity
+                name: Current Humidity
+              - entity: sensor.smart_thermostat_humidifier_setpoint
+                name: Active Setpoint
+              - type: divider
+              - entity: input_boolean.humidifier_manual_setpoint
+                name: Manual Setpoint Mode
+              - entity: input_number.humidifier_manual_setpoint
+                name: Manual Setpoint
+          - type: entities
+            title: Humidifier Auto Calculation
+            show_header_toggle: false
+            entities:
+              - entity: sensor.humidifier_auto_setpoint
+                name: Auto Setpoint
+              - entity: sensor.humidifier_effective_setpoint
+                name: Effective Setpoint
+              - type: section
+                label: Based on outdoor conditions
+              - entity: sensor.smart_thermostat_outdoor_temperature
+                name: Outdoor Temperature
+              - entity: sensor.smart_thermostat_outdoor_humidity
+                name: Outdoor Humidity
+      - type: vertical-stack
+        cards:
+          - type: entities
+            title: Thermal Model - Status
+            show_header_toggle: false
+            entities:
+              - entity: sensor.thermal_model_status
+                name: Model Status
+              - entity: sensor.active_preset_mode
+                name: Active Preset
+              - entity: binary_sensor.sensor_configuration_changed
+                name: Config Changed
+              - type: divider
+              - entity: counter.thermostat_cycles_analyzed
+                name: Cycles Analyzed
+              - entity: input_datetime.thermostat_last_model_update
+                name: Last Update
+          - type: horizontal-stack
+            cards:
+              - type: entities
+                title: Predictions
+                show_header_toggle: false
+                entities:
+                  - entity: sensor.predicted_time_to_setpoint_stage_1
+                    name: Time (Stage 1 Only)
+                  - entity: sensor.predicted_time_to_setpoint_stage_1_2
+                    name: Time (Both Stages)
+                  - entity: sensor.optimal_stage_2_delay
+                    name: Optimal Stage 2 Delay
+                  - entity: binary_sensor.stage_2_recommended
+                    name: Stage 2 Recommended
+              - type: entities
+                title: Performance
+                show_header_toggle: false
+                entities:
+                  - entity: sensor.current_heat_loss_rate
+                    name: Heat Loss Rate
+                  - entity: sensor.heating_efficiency_score
+                    name: Efficiency Score
+                  - type: divider
+                  - entity: input_number.thermostat_target_cycle_time
+                    name: Target Cycle Time
+                  - entity: sensor.recommended_target_cycle_time
+                    name: Recommended
+      - type: vertical-stack
+        cards:
+          - type: markdown
+            content: >
+              ## Thermal Model Parameters
+
+              These parameters are learned automatically. Higher confidence =
+              more reliable predictions.
+          - type: horizontal-stack
+            cards:
+              - type: entities
+                title: Home Preset
+                show_header_toggle: false
+                entities:
+                  - entity: input_number.thermostat_model_confidence_home
+                    name: Confidence
+                  - type: divider
+                  - entity: input_number.thermostat_heat_loss_coefficient_home
+                    name: Heat Loss Coeff
+                  - entity: input_number.thermostat_stage1_heating_rate_home
+                    name: Stage 1 Rate
+                  - entity: input_number.thermostat_stage2_additional_rate_home
+                    name: Stage 2 Add Rate
+              - type: entities
+                title: Away Preset
+                show_header_toggle: false
+                entities:
+                  - entity: input_number.thermostat_model_confidence_away
+                    name: Confidence
+                  - type: divider
+                  - entity: input_number.thermostat_heat_loss_coefficient_away
+                    name: Heat Loss Coeff
+                  - entity: input_number.thermostat_stage1_heating_rate_away
+                    name: Stage 1 Rate
+                  - entity: input_number.thermostat_stage2_additional_rate_away
+                    name: Stage 2 Add Rate
+          - type: horizontal-stack
+            cards:
+              - type: entities
+                title: Sleep Preset
+                show_header_toggle: false
+                entities:
+                  - entity: input_number.thermostat_model_confidence_sleep
+                    name: Confidence
+                  - type: divider
+                  - entity: input_number.thermostat_heat_loss_coefficient_sleep
+                    name: Heat Loss Coeff
+                  - entity: input_number.thermostat_stage1_heating_rate_sleep
+                    name: Stage 1 Rate
+                  - entity: input_number.thermostat_stage2_additional_rate_sleep
+                    name: Stage 2 Add Rate
+              - type: entities
+                title: Boost Preset
+                show_header_toggle: false
+                entities:
+                  - entity: input_number.thermostat_model_confidence_boost
+                    name: Confidence
+                  - type: divider
+                  - entity: input_number.thermostat_heat_loss_coefficient_boost
+                    name: Heat Loss Coeff
+                  - entity: input_number.thermostat_stage1_heating_rate_boost
+                    name: Stage 1 Rate
+                  - entity: input_number.thermostat_stage2_additional_rate_boost
+                    name: Stage 2 Add Rate
+          - type: entities
+            title: Global Parameters
+            show_header_toggle: false
+            entities:
+              - entity: input_number.thermostat_thermal_mass
+                name: Thermal Mass (τ)
+              - type: divider
+              - entity: input_number.thermostat_house_square_feet
+                name: House Size
+              - entity: input_number.thermostat_house_year_built
+                name: Year Built
+      - type: vertical-stack
+        cards:
+          - type: entities
+            title: Runtime Statistics - Today
+            show_header_toggle: false
+            entities:
+              - entity: sensor.smart_thermostat_heat_stage_1_runtime_today
+                name: Heat Stage 1
+              - entity: sensor.smart_thermostat_heat_stage_2_runtime_today
+                name: Heat Stage 2
+              - entity: sensor.heating_runtime_today
+                name: Total Heating
+              - type: divider
+              - entity: sensor.cooling_runtime_today
+                name: Cooling
+              - type: divider
+              - entity: sensor.humidifier_runtime_today
+                name: Humidifier
+              - type: divider
+              - entity: counter.thermostat_heating_cycles_today
+                name: Heating Cycles
+              - entity: counter.thermostat_cooling_cycles_today
+                name: Cooling Cycles
+          - type: entities
+            title: Control Time - Today
+            show_header_toggle: false
+            entities:
+              - entity: sensor.smart_thermostat_control_time_today
+                name: Smart Thermostat
+              - entity: sensor.ecobee_control_time_today
+                name: Ecobee Passthrough
+      - type: entities
+        title: Runtime Statistics - This Week
+        show_header_toggle: false
+        entities:
+          - entity: sensor.heating_runtime_this_week
+            name: Total Heating
+          - entity: sensor.stage_2_runtime_this_week
+            name: Stage 2 Runtime
+          - entity: sensor.heating_cycles_this_week
+            name: Heating Cycles
+          - type: divider
+          - entity: sensor.outdoor_temperature_avg_week
+            name: Avg Outdoor Temp
+      - type: vertical-stack
+        cards:
+          - type: entities
+            title: Ecobee Integration
+            show_header_toggle: false
+            entities:
+              - entity: switch.smart_thermostat_ecobee_passthrough_mode
+                name: Passthrough Mode
+              - entity: input_boolean.ecobee_passthrough_on_vacation
+                name: Auto Passthrough on Vacation
+              - type: divider
+              - entity: sensor.thermostat_ecobee_passthrough_status
+                name: Status
+          - type: horizontal-stack
+            cards:
+              - type: entities
+                title: Ecobee Inputs
+                show_header_toggle: false
+                entities:
+                  - entity: binary_sensor.smart_thermostat_ecobee_heat_stage_1_input
+                    name: W1 (Heat 1)
+                  - entity: binary_sensor.smart_thermostat_ecobee_heat_stage_2_input
+                    name: W2 (Heat 2)
+                  - entity: binary_sensor.smart_thermostat_ecobee_cooling_input
+                    name: Y1 (Cool)
+                  - entity: binary_sensor.smart_thermostat_ecobee_fan_input
+                    name: G (Fan)
+              - type: entities
+                title: System Comparison
+                show_header_toggle: false
+                entities:
+                  - entity: sensor.thermostat_system_mismatch_status
+                    name: Mismatch Status
+                  - entity: binary_sensor.thermostat_system_mismatch_detected
+                    name: Mismatch Alert
+      - type: vertical-stack
+        cards:
+          - type: entities
+            title: Maintenance Mode
+            show_header_toggle: false
+            state_color: true
+            entities:
+              - entity: switch.smart_thermostat_maintenance_mode
+                name: Enable Maintenance Mode
+              - entity: switch.smart_thermostat_maintenance_mode_keep_enabled
+                name: Keep Enabled (Disable Timer)
+              - type: section
+                label: Manual Controls (Only active in maintenance mode)
+          - type: horizontal-stack
+            cards:
+              - type: entities
+                title: Manual Relay Control
+                show_header_toggle: false
+                state_color: true
+                entities:
+                  - entity: switch.smart_thermostat_maintenance_heat_stage_1
+                    name: Heat Stage 1
+                    tap_action:
+                      action: toggle
+                  - entity: switch.smart_thermostat_maintenance_heat_stage_2
+                    name: Heat Stage 2
+                    tap_action:
+                      action: toggle
+                  - entity: switch.smart_thermostat_maintenance_cooling
+                    name: Cooling
+                    tap_action:
+                      action: toggle
+                  - entity: switch.smart_thermostat_maintenance_fan
+                    name: Fan
+                    tap_action:
+                      action: toggle
+              - type: markdown
+                content: >
+                  ### Maintenance Mode Safety
+
+
+                  **Auto-Disable:** 30 minutes
+
+
+                  **Warning:** Climate control is disabled in maintenance mode.
+                  Use for testing only.
+
+
+                  **Manual Controls:** Only work when maintenance mode is
+                  enabled.
+      - type: vertical-stack
+        cards:
+          - type: markdown
+            content: |
+              ## Advanced Settings
+              Fine-tune system behavior and timing parameters
+          - type: horizontal-stack
+            cards:
+              - type: entities
+                title: Stage 2 & Delays
+                show_header_toggle: false
+                entities:
+                  - entity: number.smart_thermostat_stage_2_delay
+                    name: Stage 2 Delay
+                  - entity: sensor.optimal_stage_2_delay
+                    name: Model Optimal Delay
+                  - type: divider
+                  - entity: number.smart_thermostat_min_heat_run_time
+                    name: Min Heat Runtime
+                  - entity: number.smart_thermostat_min_cool_run_time
+                    name: Min Cool Runtime
+              - type: entities
+                title: Compressor Protection
+                show_header_toggle: false
+                entities:
+                  - entity: number.smart_thermostat_min_compressor_off_time
+                    name: Min Off Time
+                  - entity: number.smart_thermostat_min_compressor_run_time
+                    name: Min Run Time
+                  - type: divider
+                  - entity: sensor.smart_thermostat_compressor_lockout_remaining
+                    name: Lockout Remaining
+          - type: horizontal-stack
+            cards:
+              - type: entities
+                title: Fan Control
+                show_header_toggle: false
+                entities:
+                  - entity: number.smart_thermostat_fan_post_run_time_heat
+                    name: Post-Run (Heat)
+                  - entity: number.smart_thermostat_fan_post_run_time_cool
+                    name: Post-Run (Cool)
+              - type: entities
+                title: Temperature Control
+                show_header_toggle: false
+                entities:
+                  - entity: number.smart_thermostat_thermostat_deadband
+                    name: Temperature Deadband
+      - type: entities
+        title: Filter Maintenance
+        show_header_toggle: false
+        entities:
+          - entity: sensor.smart_thermostat_filter_runtime
+            name: Filter Runtime
+          - entity: number.smart_thermostat_filter_runtime_threshold
+            name: Change Threshold
+          - type: divider
+          - entity: button.smart_thermostat_reset_filter_runtime
+            name: Reset Filter Runtime
+            icon: mdi:restart
+      - type: entities
+        title: System Information
+        show_header_toggle: false
+        entities:
+          - entity: sensor.smart_thermostat_uptime
+            name: Uptime
+          - entity: sensor.smart_thermostat_wifi_signal
+            name: WiFi Signal
+          - entity: sensor.smart_thermostat_ip_address
+            name: IP Address
+          - entity: sensor.smart_thermostat_ssid
+            name: Connected SSID
+          - entity: sensor.smart_thermostat_esphome_version
+            name: ESPHome Version
+          - type: divider
+          - entity: button.smart_thermostat_emergency_stop
+            name: Emergency Stop
+            icon: mdi:alert-octagon
+      - type: history-graph
+        title: Temperature History - 24 Hours
+        hours_to_show: 24
+        refresh_interval: 60
+        entities:
+          - entity: sensor.smart_thermostat_compensated_temperature
+            name: Compensated Temp
+          - entity: sensor.thermostat_average_temperature
+            name: Averaged Temp
+          - entity: sensor.smart_thermostat_local_temperature
+            name: Local DHT22
+          - entity: sensor.smart_thermostat_outdoor_temperature
+            name: Outdoor Temp
+      - type: history-graph
+        title: Humidity History - 24 Hours
+        hours_to_show: 24
+        refresh_interval: 60
+        entities:
+          - entity: sensor.thermostat_average_humidity
+            name: Averaged Humidity
+          - entity: sensor.smart_thermostat_local_humidity
+            name: Local DHT22
+          - entity: sensor.smart_thermostat_outdoor_humidity
+            name: Outdoor Humidity
+          - entity: sensor.smart_thermostat_humidifier_setpoint
+            name: Humidifier Setpoint
+      - type: history-graph
+        title: HVAC Activity - 24 Hours
+        hours_to_show: 24
+        refresh_interval: 60
+        entities:
+          - entity: binary_sensor.smart_thermostat_heating_active
+            name: Heating
+          - entity: binary_sensor.smart_thermostat_stage_2_active
+            name: Stage 2
+          - entity: binary_sensor.smart_thermostat_cooling_active
+            name: Cooling
+          - entity: switch.smart_thermostat_humidifier_relay
+            name: Humidifier
+      - type: history-graph
+        title: Thermal Model Metrics - 7 Days
+        hours_to_show: 168
+        refresh_interval: 300
+        entities:
+          - entity: sensor.heating_efficiency_score
+            name: Efficiency Score
+          - entity: sensor.current_heat_loss_rate
+            name: Heat Loss Rate
+          - entity: input_number.thermostat_model_confidence_home
+            name: Home Confidence
+          - entity: input_number.thermostat_model_confidence_away
+            name: Away Confidence

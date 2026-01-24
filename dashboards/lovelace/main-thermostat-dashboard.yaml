@@ -1,0 +1,382 @@
+# Main Thermostat Control Dashboard
+# Created by Cascade
+
+title: "Smart Thermostat"
+views:
+  # Overview Tab
+  - title: Overview
+    path: overview
+    icon: mdi:home-thermostat
+    layout:
+      type: custom:sections-layout
+    cards:
+      - type: thermostat
+        entity: climate.smart_thermostat
+        view_layout:
+          grid-column: "1 / 3"
+
+      - type: horizontal-stack
+        cards:
+          - type: custom:bubble-card
+            card_type: separator
+            name: System Status
+            icon: mdi:information-outline
+          - type: custom:bubble-card
+            card_type: button
+            entity: sensor.active_preset_mode
+            name: Preset
+            icon: mdi:tune
+          - type: custom:bubble-card
+            card_type: button
+            entity: binary_sensor.smart_thermostat_heating_active
+            name: Heating
+            icon: mdi:fire
+          - type: custom:bubble-card
+            card_type: button
+            entity: binary_sensor.smart_thermostat_stage_2_active
+            name: Stage 2
+            icon: mdi:fire-double
+
+      - type: custom:apexcharts-card
+        header:
+          show: true
+          title: Temperature Trends
+          show_states: true
+        series:
+          - entity: sensor.thermostat_average_temperature
+            name: Indoor Avg
+            stroke_width: 2
+          - entity: climate.smart_thermostat
+            attribute: temperature
+            name: Setpoint
+            stroke_width: 2
+            curve: stepline
+          - entity: sensor.outdoor_temperature_celsius
+            name: Outdoor
+            stroke_width: 1
+        graph_span: 3h
+        span:
+          end: minute
+
+      - type: entities
+        title: Modes & Presets
+        entities:
+          - entity: input_select.house_mode
+          - entity: input_boolean.sleep_mode
+          - entity: input_boolean.vacation_mode
+          - entity: input_boolean.guest_mode
+
+      - type: entities
+        title: Current Heating Cycle
+        entities:
+          - entity: sensor.current_temperature_delta
+            name: Temperature to Go
+          - entity: sensor.heating_cycle_progress
+            name: Temperature Gain This Cycle
+          - entity: binary_sensor.losing_ground_while_heating
+            name: ⚠️ Losing Ground Alert
+
+  # Thermal Model Tab
+  - title: Thermal Model
+    path: thermal-model
+    icon: mdi:brain
+    layout:
+      type: custom:sections-layout
+    cards:
+      - type: vertical-stack
+        title: Home Preset
+        cards:
+          - type: custom:bubble-card
+            card_type: separator
+            name: Home Preset
+            icon: mdi:home
+          - type: horizontal-stack
+            cards:
+              - type: gauge
+                entity: input_number.thermostat_model_confidence_home
+                name: Confidence
+                min: 20
+                max: 95
+                segments:
+                  - from: 20
+                    color: '#db4437'
+                  - from: 50
+                    color: '#ffa600'
+                  - from: 80
+                    color: '#4caf50'
+              - type: entities
+                entities:
+                  - entity: input_number.thermostat_stage1_heating_rate_home
+                  - entity: input_number.thermostat_stage2_additional_rate_home
+                  - entity: input_number.thermostat_heat_loss_coefficient_home
+
+      - type: vertical-stack
+        title: Away Preset
+        cards:
+          - type: custom:bubble-card
+            card_type: separator
+            name: Away Preset
+            icon: mdi:briefcase
+          - type: horizontal-stack
+            cards:
+              - type: gauge
+                entity: input_number.thermostat_model_confidence_away
+                name: Confidence
+                min: 20
+                max: 95
+                segments:
+                  - from: 20
+                    color: '#db4437'
+                  - from: 50
+                    color: '#ffa600'
+                  - from: 80
+                    color: '#4caf50'
+              - type: entities
+                entities:
+                  - entity: input_number.thermostat_stage1_heating_rate_away
+                  - entity: input_number.thermostat_stage2_additional_rate_away
+                  - entity: input_number.thermostat_heat_loss_coefficient_away
+
+      - type: vertical-stack
+        title: Sleep Preset
+        cards:
+          - type: custom:bubble-card
+            card_type: separator
+            name: Sleep Preset
+            icon: mdi:sleep
+          - type: horizontal-stack
+            cards:
+              - type: gauge
+                entity: input_number.thermostat_model_confidence_sleep
+                name: Confidence
+                min: 20
+                max: 95
+                segments:
+                  - from: 20
+                    color: '#db4437'
+                  - from: 50
+                    color: '#ffa600'
+                  - from: 80
+                    color: '#4caf50'
+              - type: entities
+                entities:
+                  - entity: input_number.thermostat_stage1_heating_rate_sleep
+                  - entity: input_number.thermostat_stage2_additional_rate_sleep
+                  - entity: input_number.thermostat_heat_loss_coefficient_sleep
+
+      - type: vertical-stack
+        title: Boost Preset
+        cards:
+          - type: custom:bubble-card
+            card_type: separator
+            name: Boost Preset
+            icon: mdi:rocket
+          - type: horizontal-stack
+            cards:
+              - type: gauge
+                entity: input_number.thermostat_model_confidence_boost
+                name: Confidence
+                min: 20
+                max: 95
+                segments:
+                  - from: 20
+                    color: '#db4437'
+                  - from: 50
+                    color: '#ffa600'
+                  - from: 80
+                    color: '#4caf50'
+              - type: entities
+                entities:
+                  - entity: input_number.thermostat_stage1_heating_rate_boost
+                  - entity: input_number.thermostat_stage2_additional_rate_boost
+                  - entity: input_number.thermostat_heat_loss_coefficient_boost
+
+      - type: entities
+        title: Thermal Model Predictions
+        entities:
+          - entity: sensor.predicted_time_to_setpoint_stage_1
+            name: Stage 1 Only (minutes)
+          - entity: sensor.predicted_time_to_setpoint_stage_1_2
+            name: Both Stages (minutes)
+          - entity: input_number.thermostat_target_cycle_time
+            name: Target Cycle Time (minutes)
+          - entity: sensor.current_heat_loss_rate
+            name: Current Heat Loss Rate (°C/hr)
+
+      - type: history-graph
+        title: Learning Progress Over Time (Home Preset)
+        hours_to_show: 168
+        entities:
+          - entity: input_number.thermostat_stage1_heating_rate_home
+            name: Stage 1 Rate
+          - entity: input_number.thermostat_stage2_additional_rate_home
+            name: Stage 2 Add Rate
+          - entity: input_number.thermostat_model_confidence_home
+            name: Confidence
+
+  # Stage 2 Control Tab
+  - title: Stage 2 Control
+    path: stage2-control
+    icon: mdi:fire-truck
+    layout:
+      type: custom:sections-layout
+    cards:
+      - type: entities
+        title: Status & Overrides
+        entities:
+          - entity: binary_sensor.smart_thermostat_stage_2_active
+            name: Stage 2 Active
+          - entity: binary_sensor.stage_2_recommended
+            name: Stage 2 Recommended
+          - entity: input_boolean.stage2_temporarily_disabled
+            name: Temporarily Disable Stage 2
+          - entity: input_number.stage2_disable_timeout
+            name: Disable Timeout
+
+      - type: entities
+        title: Control Logic
+        entities:
+          - entity: binary_sensor.stage_2_should_engage
+            name: Master Engagement Sensor
+          - entity: binary_sensor.stage_2_near_setpoint_inhibit
+            name: "Inhibit: Near Setpoint"
+          - entity: binary_sensor.stage_2_large_delta_trigger
+            name: "Trigger: Large Delta"
+          - entity: binary_sensor.losing_ground_while_heating
+            name: "Trigger: Losing Ground"
+
+      - type: entities
+        title: Urgency Factors
+        entities:
+          - entity: input_number.stage2_urgency_home
+          - entity: input_number.stage2_urgency_away
+          - entity: input_number.stage2_urgency_sleep
+          - entity: input_number.stage2_urgency_boost
+
+  # Settings Tab
+  - title: Settings
+    path: settings
+    icon: mdi:cog
+    layout:
+      type: custom:sections-layout
+    cards:
+      - type: entities
+        title: General Settings
+        entities:
+          - entity: input_number.thermostat_house_square_feet
+          - entity: input_number.thermostat_house_year_built
+          - entity: input_number.thermostat_target_cycle_time
+          - entity: input_number.thermostat_default_stage2_delay
+
+      - type: entities
+        title: Sensor Configuration
+        entities:
+          - entity: input_boolean.thermostat_use_living_room_temp
+          - entity: input_boolean.thermostat_use_bedroom_temp
+          - entity: input_boolean.thermostat_use_kitchen_temp
+          - entity: input_boolean.thermostat_use_office_temp
+          - entity: input_boolean.thermostat_use_living_room_humidity
+          - entity: input_boolean.thermostat_use_bedroom_humidity
+          - entity: input_boolean.thermostat_use_kitchen_humidity
+          - entity: input_boolean.thermostat_use_office_humidity
+
+      - type: entities
+        title: Passthrough & Maintenance
+        entities:
+          - entity: switch.smart_thermostat_ecobee_passthrough_mode
+          - entity: input_boolean.ecobee_passthrough_on_vacation
+          - entity: switch.smart_thermostat_maintenance_mode
+          - entity: switch.smart_thermostat_maintenance_heat_stage_1
+          - entity: switch.smart_thermostat_maintenance_heat_stage_2
+          - entity: switch.smart_thermostat_maintenance_cooling
+
+  # Diagnostics Tab
+  - title: Diagnostics
+    path: diagnostics
+    icon: mdi:chart-bar
+    layout:
+      type: custom:sections-layout
+    cards:
+      - type: custom:apexcharts-card
+        header:
+          show: true
+          title: Daily Runtimes
+        graph_span: 7d
+        series:
+          - entity: sensor.heating_runtime_today
+            name: Heating
+            type: column
+            group_by:
+              func: max
+              duration: 24h
+          - entity: sensor.stage_2_runtime_today
+            name: Stage 2
+            type: column
+            group_by:
+              func: max
+              duration: 24h
+
+      - type: entities
+        title: Performance & Efficiency
+        entities:
+          - entity: sensor.heating_cycles_this_week
+          - entity: sensor.heating_runtime_this_week
+          - entity: sensor.stage_2_runtime_this_week
+          - entity: sensor.heating_efficiency_score
+          - entity: sensor.temperature_change_stats_during_heating
+
+      - type: entities
+        title: System Status
+        entities:
+          - entity: binary_sensor.thermostat_system_mismatch_detected
+          - entity: sensor.thermostat_system_mismatch_status
+          - entity: binary_sensor.losing_ground_while_heating
+          - entity: binary_sensor.smart_thermostat_boot_lockout_active
+
+      - type: history-graph
+        title: HVAC Activity - 24 Hours
+        hours_to_show: 24
+        entities:
+          - entity: binary_sensor.smart_thermostat_heating_active
+            name: Heating
+          - entity: binary_sensor.smart_thermostat_stage_2_active
+            name: Stage 2
+          - entity: switch.smart_thermostat_humidifier_relay
+            name: Humidifier
+
+      - type: vertical-stack
+        title: Rate-of-Change Diagnostics
+        cards:
+          - type: entities
+            entities:
+              - entity: sensor.temperature_change_stats_during_heating # Placeholder, assuming this is similar to the 5/10min sensors
+                name: Change Rate (1hr avg)
+              - entity: binary_sensor.losing_ground_while_heating
+                name: ⚠️ Losing Ground Alert
+          - type: history-graph
+            title: Temperature Change Rate Trend
+            hours_to_show: 6
+            entities:
+              - entity: sensor.temperature_change_stats_during_heating # Placeholder
+                name: Change Rate
+
+      - type: gauge
+        title: Heating Efficiency
+        entity: sensor.heating_efficiency_score
+        min: 0
+        max: 100
+        needle: true
+        severity:
+          red: 0
+          yellow: 60
+          green: 80
+
+      - type: entities
+        title: Safety & Diagnostics
+        entities:
+          - type: section
+            label: 'Stage 1 Rate Bounds: 0.4 - 8.0 °C/hr'
+          - type: section
+            label: 'Stage 2 Add Bounds: 0.2 - 6.0 °C/hr'
+          - type: section
+            label: 'Heat Loss Bounds: 0.1 - 2.5'
