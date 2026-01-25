@@ -68,6 +68,10 @@ climate:
           id(last_hvac_mode) = 1;
           ESP_LOGI("hvac", "Heat stage 1 starting");
       - switch.turn_on: heat_stage1_relay
+      - wait_until:
+          condition:
+            lambda: 'return id(heat_stage1_relay).state;'
+          timeout: 2s
       - switch.turn_on: fan_relay
       - lambda: 'id(heat_stage1_start_time) = millis();'
       # STAGE 2: Stage 2 delay and engagement - Comment out the following lines to disable stage 2
@@ -84,7 +88,7 @@ climate:
       - wait_until:
           timeout: !lambda "return id(stage2_delay_minutes).state * 60 * 1000;"
           condition:
-            lambda: 'return !id(heat_stage1_relay).state;'
+            lambda: 'return !id(heat_stage1_relay).state || id(stage2_should_engage).state;'
       # If heating ended during the delay, do not attempt Stage 2.
       - if:
           condition:
@@ -107,6 +111,10 @@ climate:
                         - lambda: |-
                             ESP_LOGI("hvac", "Engaging heat stage 2");
                         - switch.turn_on: heat_stage2_relay
+                        - wait_until:
+                            condition:
+                              lambda: 'return id(heat_stage2_relay).state;'
+                            timeout: 2s
                   # Only delay if Stage 2 wasn't just engaged (avoid unnecessary wait)
                   - if:
                       condition:

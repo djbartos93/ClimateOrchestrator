@@ -10,7 +10,7 @@ substitutions:
   # GitHub Branch for Package Loading
   # Change this to test different branches without modifying package includes
   # Options: main, feature/stage2-phase2-preset-urgency, or any branch name
-  github_ref: &github_ref feature/stage2-phase2-preset-urgency
+  github_ref: &github_ref main
 
   # Network Configuration
   # To switch between WiFi and Ethernet, comment/uncomment the appropriate section around line 105
