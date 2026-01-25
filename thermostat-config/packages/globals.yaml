@@ -130,6 +130,12 @@ globals:
     restore_value: no
     initial_value: '0'  # 0=none, 1=heating, 2=cooling
 
+  # Flag to trigger immediate Stage 2 engagement (bypass delay)
+  - id: force_stage_2_requested
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
   # Flag to track if climate settings (deadband/overrun) have been synced from number inputs
   - id: climate_settings_synced
     type: bool

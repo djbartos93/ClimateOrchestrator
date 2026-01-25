@@ -528,21 +528,6 @@ binary_sensor:
     web_server:
       sorting_group_id: group_overrides
 
-  # Import stage 2 control logic from Home Assistant
-  - platform: homeassistant
-    name: "Stage 2 Should Engage"
-    id: stage2_should_engage
-    entity_id: binary_sensor.stage_2_should_engage
-    internal: true
-    on_state:
-      - lambda: |-
-          ESP_LOGI("hvac", "HA stage2_should_engage updated: %s", x ? "ON" : "OFF");
-          // Allow dynamic downstaging: if HA says disable Stage 2, and it's currently on, turn it off.
-          if (!x && id(heat_stage2_relay).state) {
-            ESP_LOGI("hvac", "Downstaging to Stage 1 requested by Thermal Model");
-            id(heat_stage2_relay).turn_off();
-          }
-
   - platform: status
     id: api_connected_sensor
     on_press:

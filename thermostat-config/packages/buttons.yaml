@@ -48,4 +48,19 @@ button:
           id(boot_lockout) = false;
           ESP_LOGW("safety", "Operator bypass: boot lockout disabled");
 
+  - platform: template
+    name: "Force Stage 2"
+    id: force_stage_2
+    icon: "mdi:fire-alert"
+    web_server:
+      sorting_group_id: group_climate
+    on_press:
+      - lambda: |-
+          if (id(heat_stage1_relay).state) {
+            id(force_stage_2_requested) = true;
+            ESP_LOGI("hvac", "Force Stage 2 requested by user");
+          } else {
+            ESP_LOGW("hvac", "Cannot force Stage 2: Stage 1 is not active");
+          }
+
 # Interval checks for safety, monitoring, and runtime tracking
