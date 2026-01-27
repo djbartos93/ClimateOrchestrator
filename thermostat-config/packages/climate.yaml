@@ -25,6 +25,18 @@ climate:
       - name: Boost
         default_target_temperature_low: 22.78 °C
         default_target_temperature_high: 23 °C
+      - name: Work From Home
+        default_target_temperature_low: 21.67 °C
+        default_target_temperature_high: 23 °C
+      - name: First Floor Only
+        default_target_temperature_low: 22.22 °C
+        default_target_temperature_high: 23 °C
+      - name: evening
+        default_target_temperature_low: 22.50 °C
+        default_target_temperature_high: 23 °C
+      - name: spare
+        default_target_temperature_low: 21.67 °C
+        default_target_temperature_high: 23 °C
 
  
     min_idle_time: 10s
