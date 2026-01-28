@@ -63,4 +63,23 @@ button:
             ESP_LOGW("hvac", "Cannot force Stage 2: Stage 1 is not active");
           }
 
+  - platform: template
+    name: "Disable Stage 2"
+    id: disable_stage_2
+    icon: "mdi:fire-off"
+    web_server:
+      sorting_group_id: group_climate
+    on_press:
+      - lambda: |-
+          if (id(heat_stage2_relay).state) {
+            ESP_LOGI("hvac", "Disable Stage 2 requested by user - turning off Stage 2 relay");
+          } else {
+            ESP_LOGW("hvac", "Disable Stage 2 pressed but Stage 2 is not active");
+          }
+      - if:
+          condition:
+            lambda: 'return id(heat_stage2_relay).state;'
+          then:
+            - switch.turn_off: heat_stage2_relay
+
 # Interval checks for safety, monitoring, and runtime tracking

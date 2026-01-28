@@ -207,7 +207,7 @@ sensor:
       bool remote_is_fresh = time_since_update < (${remote_temp_timeout} * 1000);
       float remote_temp = id(remote_temperature_override).state;
       bool remote_is_valid = !isnan(remote_temp) && remote_temp > 5.0 && remote_temp < 35.0;
-      
+
       // SANITY CHECK: Compare remote to local
       // If the difference is > 10°C, we assume the HA average is "insane" (e.g. a sensor in a sunlit room)
       bool remote_is_sane = true;
@@ -218,21 +218,66 @@ sensor:
         }
       }
 
-      // Use remote if fresh, valid, and sane
-      if (remote_is_fresh && remote_is_valid && remote_is_sane) {
+      // DIVERGENCE CHECK: Detect stale remote values during HVAC operation
+      // If HVAC has been running long enough, local sensor should reflect the effect.
+      // If local is changing but remote is stuck, remote data is stale.
+      bool remote_value_stale = false;
+      if (remote_is_fresh && remote_is_valid && remote_is_sane && local_is_valid) {
+        unsigned long now = millis();
+        unsigned long stale_check_ms = ${stale_value_hvac_minutes} * 60UL * 1000UL;
+        float local_change_threshold = ${stale_value_local_change};
+        float remote_epsilon = ${stale_value_remote_epsilon};
+        float local_start = id(local_temp_at_hvac_start);
+        float remote_start = id(remote_temp_at_hvac_start);
+        bool start_temps_valid = !isnan(local_start) && !isnan(remote_start)
+                                 && local_start > 0.0 && remote_start > 0.0;
+
+        // HEATING divergence check
+        if (start_temps_valid && id(heat_stage1_relay).state && id(heat_stage1_start_time) > 0) {
+          unsigned long heat_elapsed = now - id(heat_stage1_start_time);
+          if (heat_elapsed > stale_check_ms) {
+            float local_rise = local_temp - local_start;
+            float remote_change = abs(remote_temp - remote_start);
+            if (local_rise > local_change_threshold && remote_change < remote_epsilon) {
+              remote_value_stale = true;
+              ESP_LOGW("effective_temp", "STALE REMOTE (heating): local rose %.2f°C but remote changed only %.2f°C",
+                       local_rise, remote_change);
+            }
+          }
+        }
+
+        // COOLING divergence check
+        if (!remote_value_stale && start_temps_valid && id(cool_relay).state && id(cool_start_time) > 0) {
+          unsigned long cool_elapsed = now - id(cool_start_time);
+          if (cool_elapsed > stale_check_ms) {
+            float local_drop = local_start - local_temp;
+            float remote_change = abs(remote_temp - remote_start);
+            if (local_drop > local_change_threshold && remote_change < remote_epsilon) {
+              remote_value_stale = true;
+              ESP_LOGW("effective_temp", "STALE REMOTE (cooling): local dropped %.2f°C but remote changed only %.2f°C",
+                       local_drop, remote_change);
+            }
+          }
+        }
+      }
+
+      // Use remote if fresh, valid, sane, and not value-stale
+      if (remote_is_fresh && remote_is_valid && remote_is_sane && !remote_value_stale) {
         return remote_temp;
       }
 
       // 3. Fallback to local DHT22
       if (local_is_valid) {
-        if (!remote_is_sane) {
+        if (remote_value_stale) {
+          ESP_LOGW("effective_temp", "Using local: Remote value stuck during HVAC operation.");
+        } else if (!remote_is_sane) {
           ESP_LOGW("effective_temp", "Using local: Remote reading was WILDLY different.");
         } else if (!remote_is_fresh) {
           ESP_LOGW("effective_temp", "Using local: Remote temperature stale.");
         }
         return local_temp;
       } else {
-        ESP_LOGE("effective_temp", "All temperatures invalid! Safety fallback to 5.0C (41F) to prevent freezing");
+        ESP_LOGE("effective_temp", "All temperatures invalid! Safety fallback to 21.0C (70F) to prevent freezing");
         return 21.0;
       }
     on_value:
@@ -623,6 +668,55 @@ binary_sensor:
       unsigned long time_since_update = millis() - id(last_remote_humidity_update);
       return time_since_update > (${remote_humidity_timeout} * 1000);
     device_class: problem
+
+  # Remote temperature VALUE stale (divergence detection during HVAC operation)
+  # True when HVAC is running, local sensor shows expected change, but remote is stuck
+  - platform: template
+    name: "Remote Temperature Value Stale"
+    id: remote_temp_value_stale
+    icon: "mdi:thermometer-alert"
+    device_class: problem
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: group_system_status
+    lambda: |-
+      float local_temp = id(local_temperature).state;
+      float remote_temp = id(remote_temperature_override).state;
+      float local_start = id(local_temp_at_hvac_start);
+      float remote_start = id(remote_temp_at_hvac_start);
+      bool valid = !isnan(local_temp) && !isnan(remote_temp)
+                   && !isnan(local_start) && !isnan(remote_start)
+                   && local_start > 0.0 && remote_start > 0.0;
+      if (!valid) return false;
+
+      unsigned long now = millis();
+      unsigned long stale_check_ms = ${stale_value_hvac_minutes} * 60UL * 1000UL;
+      float local_change_threshold = ${stale_value_local_change};
+      float remote_epsilon = ${stale_value_remote_epsilon};
+
+      // Heating check
+      if (id(heat_stage1_relay).state && id(heat_stage1_start_time) > 0) {
+        if ((now - id(heat_stage1_start_time)) > stale_check_ms) {
+          float local_rise = local_temp - local_start;
+          float remote_change = abs(remote_temp - remote_start);
+          if (local_rise > local_change_threshold && remote_change < remote_epsilon) {
+            return true;
+          }
+        }
+      }
+
+      // Cooling check
+      if (id(cool_relay).state && id(cool_start_time) > 0) {
+        if ((now - id(cool_start_time)) > stale_check_ms) {
+          float local_drop = local_start - local_temp;
+          float remote_change = abs(remote_temp - remote_start);
+          if (local_drop > local_change_threshold && remote_change < remote_epsilon) {
+            return true;
+          }
+        }
+      }
+
+      return false;
 
   # HVAC state indicators
   - platform: template

@@ -142,4 +142,16 @@ globals:
     restore_value: no
     initial_value: 'false'
 
+  # Stale remote sensor detection: temperatures recorded when HVAC starts
+  # Reused for both heating and cooling (only one mode runs at a time)
+  - id: local_temp_at_hvac_start
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+
+  - id: remote_temp_at_hvac_start
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+
 #configure the RGB Status LED

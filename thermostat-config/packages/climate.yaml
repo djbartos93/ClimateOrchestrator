@@ -85,7 +85,13 @@ climate:
             lambda: 'return id(heat_stage1_relay).state;'
           timeout: 2s
       - switch.turn_on: fan_relay
-      - lambda: 'id(heat_stage1_start_time) = millis();'
+      - lambda: |-
+          id(heat_stage1_start_time) = millis();
+          // Record temperatures at HVAC start for stale remote sensor detection
+          id(local_temp_at_hvac_start) = id(local_temperature).state;
+          id(remote_temp_at_hvac_start) = id(remote_temperature_override).state;
+          ESP_LOGD("hvac", "Recorded start temps - local: %.2f, remote: %.2f",
+                   id(local_temp_at_hvac_start), id(remote_temp_at_hvac_start));
       # STAGE 2: Stage 2 delay and engagement - Comment out the following lines to disable stage 2
       # Initial delay before Stage 2 is engaged (or forced by user).
       # Abort the delay early if heating ends.
@@ -161,7 +167,13 @@ climate:
           ESP_LOGI("hvac", "Cooling mode starting");
       - switch.turn_on: cool_relay
       - switch.turn_on: fan_relay
-      - lambda: 'id(cool_start_time) = millis();'
+      - lambda: |-
+          id(cool_start_time) = millis();
+          // Record temperatures at HVAC start for stale remote sensor detection
+          id(local_temp_at_hvac_start) = id(local_temperature).state;
+          id(remote_temp_at_hvac_start) = id(remote_temperature_override).state;
+          ESP_LOGD("hvac", "Recorded cooling start temps - local: %.2f, remote: %.2f",
+                   id(local_temp_at_hvac_start), id(remote_temp_at_hvac_start));
 
     # Idle Action - supports heat/cool run/off times
     idle_action:

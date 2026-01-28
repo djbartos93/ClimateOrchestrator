@@ -64,7 +64,7 @@ substitutions:
 ####################################
 
 # Last build number / device
-  config_version: "0.3.8 - MBP Build"
+  config_version: "0.4.0 - MBP Build S2Force"
 
 # Timing Constants (all in seconds)
 # sensable defaults are in place
@@ -85,6 +85,11 @@ substitutions:
   heat_overrun: "0.27"
   cool_deadband: "0.5"
   cool_overrun: "0.5"
+
+# Stale Remote Sensor Detection (Layer 2 - ESPHome divergence check)
+  stale_value_hvac_minutes: "15"       # Minutes of HVAC operation before checking
+  stale_value_local_change: "0.3"      # Minimum local change in °C to expect
+  stale_value_remote_epsilon: "0.1"    # Remote change below this = "stuck"
 
 
 
